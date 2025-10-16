@@ -1,8 +1,19 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 export const useBoardRealtime = (projectId: string, onUpdate: () => void) => {
+  const lastUpdateByUser = useRef<string | null>(null);
+
+  // Function to track the last update by current user
+  const trackUserUpdate = (cardId: string) => {
+    lastUpdateByUser.current = cardId;
+    // Clear after a short delay to allow for the realtime event
+    setTimeout(() => {
+      lastUpdateByUser.current = null;
+    }, 1000);
+  };
+
   useEffect(() => {
     const channels = [
       // Cards channel
@@ -16,8 +27,25 @@ export const useBoardRealtime = (projectId: string, onUpdate: () => void) => {
             table: 'cards',
             filter: `project_id=eq.${projectId}`
           },
-          (payload: RealtimePostgresChangesPayload<any>) => {
+          async (payload: RealtimePostgresChangesPayload<any>) => {
             console.log('Card change:', payload);
+            
+            // Get current user
+            const { data: { user } } = await supabase.auth.getUser();
+            const currentUserId = user?.id;
+            
+            // Skip update if this change was made by the current user
+            if (payload.new && payload.new.updated_by === currentUserId) {
+              console.log('Skipping realtime update - change made by current user');
+              return;
+            }
+            
+            // Skip update if this is the same change we just made
+            if (lastUpdateByUser.current === payload.new?.id) {
+              console.log('Skipping realtime update - same change as last update');
+              return;
+            }
+            
             onUpdate();
           }
         )
@@ -115,4 +143,6 @@ export const useBoardRealtime = (projectId: string, onUpdate: () => void) => {
       channels.forEach(channel => supabase.removeChannel(channel));
     };
   }, [projectId, onUpdate]);
+
+  return { trackUserUpdate };
 };
