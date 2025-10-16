@@ -209,7 +209,7 @@ export default function Projects() {
               <Card
                 key={project.id}
                 className="cursor-pointer shadow-card transition-smooth hover:shadow-primary/20"
-                onClick={() => toast({ title: "Board será implementado no próximo prompt!" })}
+                onClick={() => navigate(`/projects/${project.id}/board`)}
               >
                 <CardHeader>
                   <div className="flex items-start justify-between">
