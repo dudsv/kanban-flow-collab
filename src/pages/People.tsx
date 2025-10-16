@@ -28,7 +28,7 @@ export default function People() {
   const [creatingDM, setCreatingDM] = useState<string | null>(null);
 
   const { onlineUsers } = usePresence('presence:people', user?.id, {
-    name: user?.user_metadata?.name,
+    name: user?.user_metadata?.name || 'Unknown',
   });
 
   useEffect(() => {

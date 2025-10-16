@@ -66,7 +66,7 @@ export function usePresence(channelName: string, userId?: string, metadata?: any
     return () => {
       presenceChannel.unsubscribe();
     };
-  }, [channelName, userId, metadata]);
+  }, [channelName, userId, metadata?.name]);
 
   return { onlineUsers, channel };
 }
