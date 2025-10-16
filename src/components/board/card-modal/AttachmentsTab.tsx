@@ -16,10 +16,9 @@ type FileItem = Database['public']['Tables']['files']['Row'] & {
 interface AttachmentsTabProps {
   card: BoardCard;
   projectId: string;
-  onUpdate: () => void;
 }
 
-export function AttachmentsTab({ card, projectId, onUpdate }: AttachmentsTabProps) {
+export function AttachmentsTab({ card, projectId }: AttachmentsTabProps) {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -51,38 +50,70 @@ export function AttachmentsTab({ card, projectId, onUpdate }: AttachmentsTabProp
 
     setUploading(true);
     try {
-      const { data: user } = await supabase.auth.getUser();
-      if (!user.user) return;
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData?.user) {
+        throw new Error('Usuário não autenticado');
+      }
 
-      for (const file of acceptedFiles) {
-        // Upload to storage
-        const filePath = `${projectId}/card-${card.id}/${crypto.randomUUID()}-${file.name}`;
+      // Optimistic update - add temporary files
+      const tempFiles = acceptedFiles.map(f => ({
+        id: `temp-${Date.now()}-${f.name}`,
+        name: f.name,
+        size_bytes: f.size,
+        mime_type: f.type,
+        created_at: new Date().toISOString(),
+        uploaded_by: userData.user.id,
+        uploader: { name: userData.user.user_metadata?.name || userData.user.email || 'Você' },
+        url: '',
+        project_id: projectId,
+        card_id: card.id,
+        folder_id: null,
+        deleted_at: null
+      }));
+      setFiles(prev => [...(tempFiles as any), ...prev]);
+
+      // Real upload
+      for (let i = 0; i < acceptedFiles.length; i++) {
+        const file = acceptedFiles[i];
+        const tempFile = tempFiles[i];
+        
+        const filePath = `${projectId}/cards/${card.id}/${crypto.randomUUID()}-${file.name}`;
         const { error: uploadError } = await supabase.storage
           .from('project-files')
           .upload(filePath, file);
 
         if (uploadError) throw uploadError;
 
-        // Insert record
-        await supabase.from('files').insert({
-          project_id: projectId,
-          card_id: card.id,
-          name: file.name,
-          url: filePath,
-          mime_type: file.type,
-          size_bytes: file.size,
-          uploaded_by: user.user.id
-        });
+        const { data: fileRecord, error: insertError } = await supabase
+          .from('files')
+          .insert({
+            project_id: projectId,
+            card_id: card.id,
+            name: file.name,
+            url: filePath,
+            mime_type: file.type,
+            size_bytes: file.size,
+            uploaded_by: userData.user.id
+          })
+          .select('*, uploader:profiles!files_uploaded_by_fkey(name)')
+          .single();
+
+        if (insertError) throw insertError;
+
+        // Replace temp with real
+        setFiles(prev => prev.map(f => 
+          f.id === tempFile.id ? (fileRecord as any) : f
+        ));
       }
 
       toast({
         title: 'Arquivos enviados',
         description: `${acceptedFiles.length} arquivo(s) adicionado(s) com sucesso.`
       });
-
-      loadFiles();
     } catch (error) {
       console.error('Error uploading files:', error);
+      // Rollback: remove temps
+      setFiles(prev => prev.filter(f => !f.id.startsWith('temp-')));
       toast({
         title: 'Erro ao enviar',
         description: 'Não foi possível enviar os arquivos.',
@@ -95,7 +126,6 @@ export function AttachmentsTab({ card, projectId, onUpdate }: AttachmentsTabProp
 
   const deleteFile = async (fileId: string, fileUrl: string) => {
     try {
-      // Use the file path directly (it's stored as path now, not URL)
       const filePath = fileUrl;
 
       // Delete from storage
@@ -110,11 +140,12 @@ export function AttachmentsTab({ card, projectId, onUpdate }: AttachmentsTabProp
         .eq('id', fileId);
 
       toast({
-        title: 'Arquivo removido',
-        description: 'O arquivo foi excluído com sucesso.'
+        title: 'Arquivo excluído',
+        description: 'O arquivo foi removido com sucesso.'
       });
 
-      loadFiles();
+      // Remove from local state
+      setFiles(prev => prev.filter(f => f.id !== fileId));
     } catch (error) {
       console.error('Error deleting file:', error);
       toast({
@@ -142,14 +173,7 @@ export function AttachmentsTab({ card, projectId, onUpdate }: AttachmentsTabProp
       .createSignedUrl(file.url, 3600);
 
     if (!error && data?.signedUrl) {
-      const win = window.open(data.signedUrl, '_blank');
-      if (!win || win.closed || typeof win.closed === 'undefined') {
-        toast({
-          title: 'Preview bloqueado',
-          description: 'Por favor, permita pop-ups ou baixe o arquivo',
-          variant: 'destructive'
-        });
-      }
+      window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -201,7 +225,11 @@ export function AttachmentsTab({ card, projectId, onUpdate }: AttachmentsTabProp
         {files.map(file => (
           <div
             key={file.id}
-            className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+            className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
+              file.id.startsWith('temp-')
+                ? 'bg-muted/50 opacity-60 animate-pulse'
+                : 'bg-muted/30 hover:bg-muted/50'
+            }`}
           >
             <File className="h-5 w-5 text-muted-foreground flex-shrink-0" />
             
@@ -221,38 +249,40 @@ export function AttachmentsTab({ card, projectId, onUpdate }: AttachmentsTabProp
               </div>
             </div>
 
-            <div className="flex items-center gap-1">
-              {isImage(file.mime_type) && (
+            {!file.id.startsWith('temp-') && (
+              <div className="flex items-center gap-1">
+                {isImage(file.mime_type) && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => viewFile(file)}
+                    title="Visualizar"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                )}
                 <Button
                   size="icon"
                   variant="ghost"
-                  onClick={() => viewFile(file)}
-                  title="Visualizar"
+                  onClick={() => downloadFile(file)}
+                  title="Download"
                 >
-                  <Eye className="h-4 w-4" />
+                  <Download className="h-4 w-4" />
                 </Button>
-              )}
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => downloadFile(file)}
-                title="Download"
-              >
-                <Download className="h-4 w-4" />
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => {
-                  if (confirm('Deseja realmente excluir este arquivo?')) {
-                    deleteFile(file.id, file.url);
-                  }
-                }}
-                title="Excluir"
-              >
-                <Trash2 className="h-4 w-4 text-destructive" />
-              </Button>
-            </div>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => {
+                    if (confirm('Deseja realmente excluir este arquivo?')) {
+                      deleteFile(file.id, file.url);
+                    }
+                  }}
+                  title="Excluir"
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+            )}
           </div>
         ))}
 

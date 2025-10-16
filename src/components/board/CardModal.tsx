@@ -84,17 +84,17 @@ export function CardModal({ mode, card, projectId, columnId, tags, onClose, onUp
 
             {mode === 'edit' && card && (
               <>
-                <TabsContent value="checklist" className="mt-0">
-                  <ChecklistTab card={card} onUpdate={onUpdate} />
-                </TabsContent>
+          <TabsContent value="checklist" className="mt-0">
+            <ChecklistTab card={card} />
+          </TabsContent>
 
-                <TabsContent value="attachments" className="mt-0">
-                  <AttachmentsTab card={card} projectId={projectId} onUpdate={onUpdate} />
-                </TabsContent>
+          <TabsContent value="attachments" className="mt-0">
+            <AttachmentsTab card={card} projectId={projectId} />
+          </TabsContent>
 
-                <TabsContent value="comments" className="mt-0">
-                  <CommentsTab card={card} projectId={projectId} onUpdate={onUpdate} />
-                </TabsContent>
+          <TabsContent value="comments" className="mt-0">
+            <CommentsTab card={card} projectId={projectId} />
+          </TabsContent>
 
                 <TabsContent value="history" className="mt-0">
                   <HistoryTab cardId={card.id} />

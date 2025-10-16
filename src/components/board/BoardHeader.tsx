@@ -58,10 +58,10 @@ export function BoardHeader({
       
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 py-4">
       <div className="flex items-center gap-4 flex-wrap">
-        {/* Botão Adicionar Card - DESTAQUE */}
+        {/* Botão Adicionar Card - ROXO */}
         {onAddCard && columns && columns.length > 0 && (
           <Button 
-            className="bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 text-primary-foreground"
+            className="bg-violet-600 hover:bg-violet-700 text-white"
             onClick={() => {
               const firstColumn = columns[0];
               if (firstColumn) {

@@ -8,6 +8,7 @@ import { FolderIcon, FileIcon, Upload, FolderPlus, Search, Trash2 } from 'lucide
 import { useDropzone } from 'react-dropzone';
 import { useFilePreview } from '@/hooks/useFilePreview';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { AppLayout } from '@/components/layout/AppLayout';
 
 export default function Files() {
@@ -15,6 +16,7 @@ export default function Files() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [files, setFiles] = useState<FileItem[]>([]);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [currentPath, setCurrentPath] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
 
@@ -45,7 +47,7 @@ export default function Files() {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
 
   const handleCreateFolder = async () => {
-    const name = prompt('Folder name:');
+    const name = prompt('Nome da pasta:');
     if (name) {
       await createFolder(name, currentFolderId);
       loadData();
@@ -53,7 +55,7 @@ export default function Files() {
   };
 
   const handleDeleteFile = async (fileId: string) => {
-    if (confirm('Delete this file?')) {
+    if (confirm('Excluir este arquivo?')) {
       await deleteFile(fileId);
       loadData();
     }
@@ -63,13 +65,15 @@ export default function Files() {
     file.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const pathSegments = currentPath.split('/').filter(Boolean);
+
   return (
     <AppLayout>
       <div className="flex h-full">
         {/* Sidebar - Folder Tree */}
         <div className="w-64 border-r border-border bg-muted/30 p-4 overflow-y-auto">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold">Folders</h3>
+            <h3 className="font-semibold">Pastas</h3>
             <Button size="sm" variant="ghost" onClick={handleCreateFolder}>
               <FolderPlus className="h-4 w-4" />
             </Button>
@@ -78,17 +82,23 @@ export default function Files() {
             <Button
               variant={currentFolderId === null ? 'secondary' : 'ghost'}
               className="w-full justify-start"
-              onClick={() => setCurrentFolderId(null)}
+              onClick={() => {
+                setCurrentFolderId(null);
+                setCurrentPath('');
+              }}
             >
               <FolderIcon className="h-4 w-4 mr-2" />
-              Root
+              Raiz
             </Button>
             {folders.map(folder => (
               <Button
                 key={folder.id}
                 variant={currentFolderId === folder.id ? 'secondary' : 'ghost'}
                 className="w-full justify-start pl-6"
-                onClick={() => setCurrentFolderId(folder.id)}
+                onClick={() => {
+                  setCurrentFolderId(folder.id);
+                  setCurrentPath(folder.name);
+                }}
               >
                 <FolderIcon className="h-4 w-4 mr-2" />
                 {folder.name}
@@ -99,12 +109,51 @@ export default function Files() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
+        {/* Breadcrumbs */}
+        <div className="border-b border-border p-4">
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink 
+                  onClick={() => {
+                    setCurrentPath('');
+                    setCurrentFolderId(null);
+                  }} 
+                  className="cursor-pointer hover:text-foreground"
+                >
+                  📁 Documentos
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              {pathSegments.map((segment, index) => (
+                <BreadcrumbItem key={index}>
+                  <BreadcrumbSeparator />
+                  <BreadcrumbLink 
+                    onClick={() => setCurrentPath(pathSegments.slice(0, index + 1).join('/'))}
+                    className="cursor-pointer hover:text-foreground"
+                  >
+                    {segment.startsWith('cards/') ? '📌 Cards' : segment}
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+              ))}
+            </BreadcrumbList>
+          </Breadcrumb>
+
+          {/* Cards notice */}
+          {currentPath.startsWith('cards/') && (
+            <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3 mt-4">
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                📌 Arquivos anexados a cards
+              </p>
+            </div>
+          )}
+        </div>
+
         {/* Toolbar */}
         <div className="border-b border-border p-4 flex items-center gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search files..."
+              placeholder="Buscar arquivos..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
@@ -112,7 +161,7 @@ export default function Files() {
           </div>
           <Button onClick={handleCreateFolder} variant="outline">
             <FolderPlus className="h-4 w-4 mr-2" />
-            New Folder
+            Nova Pasta
           </Button>
           <Button {...getRootProps()}>
             <Upload className="h-4 w-4 mr-2" />
@@ -131,7 +180,7 @@ export default function Files() {
           <input {...getInputProps()} />
           {filteredFiles.length === 0 ? (
             <div className="flex items-center justify-center h-full text-muted-foreground">
-              {isDragActive ? 'Drop files here...' : 'No files. Drag and drop or click Upload.'}
+              {isDragActive ? 'Solte os arquivos aqui...' : 'Nenhum arquivo. Arraste e solte ou clique em Upload.'}
             </div>
           ) : (
             <div className="grid grid-cols-4 gap-4">
@@ -157,7 +206,7 @@ export default function Files() {
                   </div>
                   <p className="text-sm font-medium truncate">{file.name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {file.size_bytes ? `${Math.round(file.size_bytes / 1024)} KB` : 'Unknown size'}
+                    {file.size_bytes ? `${Math.round(file.size_bytes / 1024)} KB` : 'Tamanho desconhecido'}
                   </p>
                 </div>
               ))}
@@ -189,7 +238,7 @@ function FilePreviewModal({ file, open, onClose }: { file: FileItem; open: boole
           <DialogTitle>{file.name}</DialogTitle>
         </DialogHeader>
         <div className="overflow-auto">
-          {loading && <p className="text-center py-8">Loading preview...</p>}
+          {loading && <p className="text-center py-8">Carregando preview...</p>}
           {!loading && previewType === 'image' && signedUrl && (
             <img src={signedUrl} alt={file.name} className="w-full h-auto" />
           )}
@@ -198,7 +247,7 @@ function FilePreviewModal({ file, open, onClose }: { file: FileItem; open: boole
           )}
           {!loading && previewType === 'unsupported' && (
             <p className="text-center py-8 text-muted-foreground">
-              Preview not available. 
+              Preview não disponível. 
               {signedUrl && (
                 <a href={signedUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline ml-2">
                   Download

@@ -4,6 +4,7 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Mention from '@tiptap/extension-mention';
 import Placeholder from '@tiptap/extension-placeholder';
+import { mergeAttributes } from '@tiptap/core';
 import { Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -23,15 +24,14 @@ type Comment = Database['public']['Tables']['comments']['Row'] & {
 interface CommentsTabProps {
   card: BoardCard;
   projectId: string;
-  onUpdate: () => void;
 }
 
-export function CommentsTab({ card, projectId, onUpdate }: CommentsTabProps) {
+export function CommentsTab({ card, projectId }: CommentsTabProps) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [projectMembers, setProjectMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
-  const [membersLoaded, setMembersLoaded] = useState(false);
+  const [editorReady, setEditorReady] = useState(false);
 
   const MentionList = ({ items, command }: any) => {
     const [selectedIndex, setSelectedIndex] = useState(0);
@@ -75,32 +75,42 @@ export function CommentsTab({ card, projectId, onUpdate }: CommentsTabProps) {
   const editor = useEditor({
     extensions: [
       StarterKit,
-      Placeholder.configure({ placeholder: 'Escreva um comentário...' }),
+      Placeholder.configure({ placeholder: 'Escreva um comentário... Use @ para mencionar' }),
       Mention.configure({
-        HTMLAttributes: { class: 'mention bg-primary/10 text-primary px-1 rounded' },
+        HTMLAttributes: { 
+          class: 'mention bg-primary/10 text-primary px-1 rounded',
+          'data-type': 'mention'
+        },
+        renderHTML({ node }) {
+          return [
+            'span',
+            { 
+              class: 'mention bg-primary/10 text-primary px-1 rounded',
+              'data-type': 'mention',
+              'data-user-id': node.attrs.id 
+            },
+            `@${node.attrs.label}`
+          ];
+        },
         suggestion: {
           items: ({ query }) => {
-            console.log('🔍 Buscando membros para:', query, 'Total membros:', projectMembers.length);
-            const filtered = projectMembers
+            return projectMembers
               .filter(m => {
                 const name = m.profiles?.name?.toLowerCase() || '';
                 return name.includes(query.toLowerCase());
               })
               .slice(0, 5);
-            console.log('✅ Membros filtrados:', filtered.length);
-            return filtered;
           },
           render: () => {
             let component: ReactRenderer;
             let popup: TippyInstance[];
 
             return {
-            onStart: (props: any) => {
-              console.log('📝 Mention started, items:', props.items?.length || 0);
-              component = new ReactRenderer(MentionList, {
-                props,
-                editor: props.editor,
-              });
+              onStart: (props: any) => {
+                component = new ReactRenderer(MentionList, {
+                  props,
+                  editor: props.editor,
+                });
 
                 popup = tippy('body', {
                   getReferenceClientRect: props.clientRect,
@@ -112,13 +122,12 @@ export function CommentsTab({ card, projectId, onUpdate }: CommentsTabProps) {
                   placement: 'bottom-start',
                 });
               },
-            onUpdate: (props: any) => {
-              console.log('🔄 Mention updated, items:', props.items?.length || 0);
-              component.updateProps(props);
-              popup[0].setProps({
-                getReferenceClientRect: props.clientRect,
-              });
-            },
+              onUpdate: (props: any) => {
+                component.updateProps(props);
+                popup[0].setProps({
+                  getReferenceClientRect: props.clientRect,
+                });
+              },
               onKeyDown: (props: any) => {
                 if (props.event.key === 'Escape') {
                   popup[0].hide();
@@ -135,11 +144,15 @@ export function CommentsTab({ card, projectId, onUpdate }: CommentsTabProps) {
         },
       }),
     ],
-  }, [projectMembers, membersLoaded]); // Recriar editor quando membros mudarem
+  }, [projectMembers, editorReady]);
 
   useEffect(() => {
-    loadComments();
-    loadProjectMembers();
+    const init = async () => {
+      await loadProjectMembers();
+      await loadComments();
+      setEditorReady(true);
+    };
+    init();
   }, [card.id]);
 
   const loadProjectMembers = async () => {
@@ -150,12 +163,9 @@ export function CommentsTab({ card, projectId, onUpdate }: CommentsTabProps) {
         .eq('project_id', projectId);
 
       if (error) throw error;
-      console.log('✅ Membros carregados:', data?.length || 0);
       setProjectMembers(data || []);
-      setMembersLoaded(true);
     } catch (error) {
       console.error('Error loading members:', error);
-      setMembersLoaded(true);
     }
   };
 
@@ -194,7 +204,7 @@ export function CommentsTab({ card, projectId, onUpdate }: CommentsTabProps) {
         return;
       }
 
-      // ✅ Update otimista - adicionar comentário temporário
+      // Optimistic update
       const tempComment = {
         id: `temp-${Date.now()}`,
         card_id: card.id,
@@ -210,7 +220,7 @@ export function CommentsTab({ card, projectId, onUpdate }: CommentsTabProps) {
       setComments((prev) => [...prev, tempComment as Comment]);
       editor.commands.clearContent();
 
-      // Inserir no banco
+      // Insert to database
       const { data: comment, error } = await supabase
         .from('comments')
         .insert({
@@ -223,20 +233,22 @@ export function CommentsTab({ card, projectId, onUpdate }: CommentsTabProps) {
 
       if (error) {
         console.error('Comment error:', error);
-        // Rollback otimista
+        // Rollback
         setComments((prev) => prev.filter((c) => c.id !== tempComment.id));
         throw error;
       }
 
-      // Substituir temp por real
+      // Replace temp with real
       setComments((prev) =>
         prev.map((c) => (c.id === tempComment.id ? (comment as Comment) : c))
       );
 
-      // Extract mentioned user IDs
+      // Extract mentioned user IDs using DOMParser
       const mentionedUserIds = Array.from(
-        content.matchAll(/data-user-id="([^"]+)"/g)
-      ).map((match) => match[1]);
+        new DOMParser()
+          .parseFromString(content, 'text/html')
+          .querySelectorAll('[data-user-id]')
+      ).map(el => (el as HTMLElement).dataset.userId!).filter(Boolean);
 
       if (mentionedUserIds.length > 0 && comment) {
         // Insert mentions
@@ -261,8 +273,6 @@ export function CommentsTab({ card, projectId, onUpdate }: CommentsTabProps) {
         );
       }
 
-      // ❌ NÃO chamar loadComments() - confiar no update otimista
-
       toast({
         title: 'Comentário adicionado',
         description: 'Seu comentário foi publicado com sucesso.',
@@ -279,84 +289,81 @@ export function CommentsTab({ card, projectId, onUpdate }: CommentsTabProps) {
     }
   };
 
+  if (loading || !editorReady || !editor) {
+    return <div className="flex items-center justify-center p-8 text-muted-foreground">Carregando editor...</div>;
+  }
+
   return (
     <div className="space-y-6">
-      {loading ? (
-        <div className="text-center py-8">Carregando comentários...</div>
-      ) : (
-        <>
-          {/* Editor de comentário com melhor UX */}
-          <div className="space-y-3 p-4 border border-border rounded-lg bg-muted/30">
-            <label className="text-sm font-medium">Novo comentário</label>
+      {/* Editor */}
+      <div className="space-y-3 p-4 border border-border rounded-lg bg-muted/30">
+        <label className="text-sm font-medium">Novo comentário</label>
 
-            {/* TipTap Editor */}
-            <div className="border border-input rounded-md bg-background">
-              <EditorContent
-                editor={editor}
-                className="prose prose-sm max-w-none p-3 min-h-[100px] focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 rounded-md"
+        <div className="border border-input rounded-md bg-background">
+          <EditorContent
+            editor={editor}
+            className="prose prose-sm max-w-none p-3 min-h-[100px] focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 rounded-md"
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">
+            💡 Use <kbd className="px-1 py-0.5 bg-muted rounded text-xs">@</kbd> para mencionar membros
+          </p>
+          <Button onClick={postComment} disabled={posting}>
+            <Send className="h-4 w-4 mr-2" />
+            {posting ? 'Enviando...' : 'Comentar'}
+          </Button>
+        </div>
+      </div>
+
+      {/* Comments List */}
+      <div className="space-y-3">
+        <h4 className="text-sm font-semibold text-muted-foreground">
+          Comentários ({comments.length})
+        </h4>
+
+        {comments.map((comment) => (
+          <div
+            key={comment.id}
+            className={`flex gap-3 p-4 rounded-lg border transition-smooth ${
+              comment.id.startsWith('temp-')
+                ? 'bg-muted/50 opacity-60 animate-pulse'
+                : 'bg-card hover:bg-accent/5'
+            }`}
+          >
+            <Avatar className="h-9 w-9">
+              <AvatarImage src={comment.author.avatar_url || ''} />
+              <AvatarFallback>
+                {comment.author.name.substring(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+
+            <div className="flex-1 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-sm">{comment.author.name}</span>
+                <span className="text-xs text-muted-foreground">
+                  {formatDistanceToNow(new Date(comment.created_at), {
+                    addSuffix: true,
+                    locale: ptBR,
+                  })}
+                </span>
+              </div>
+              <div
+                className="text-sm prose prose-sm max-w-none dark:prose-invert"
+                dangerouslySetInnerHTML={{ __html: comment.body }}
               />
             </div>
-
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">
-                💡 Use <kbd className="px-1 py-0.5 bg-muted rounded text-xs">@</kbd> para mencionar membros
-              </p>
-              <Button onClick={postComment} disabled={posting}>
-                <Send className="h-4 w-4 mr-2" />
-                {posting ? 'Enviando...' : 'Comentar'}
-              </Button>
-            </div>
           </div>
+        ))}
 
-          {/* Lista de comentários */}
-          <div className="space-y-3">
-            <h4 className="text-sm font-semibold text-muted-foreground">
-              Comentários ({comments.length})
-            </h4>
-
-            {comments.map((comment) => (
-              <div
-                key={comment.id}
-                className={`flex gap-3 p-4 rounded-lg border transition-smooth ${
-                  comment.id.startsWith('temp-')
-                    ? 'bg-muted/50 opacity-60 animate-pulse'
-                    : 'bg-card hover:bg-accent/5'
-                }`}
-              >
-                <Avatar className="h-9 w-9">
-                  <AvatarImage src={comment.author.avatar_url || ''} />
-                  <AvatarFallback>
-                    {comment.author.name.substring(0, 2).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-
-                <div className="flex-1 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-sm">{comment.author.name}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(new Date(comment.created_at), {
-                        addSuffix: true,
-                        locale: ptBR,
-                      })}
-                    </span>
-                  </div>
-                  <div
-                    className="text-sm prose prose-sm max-w-none dark:prose-invert"
-                    dangerouslySetInnerHTML={{ __html: comment.body }}
-                  />
-                </div>
-              </div>
-            ))}
-
-            {comments.length === 0 && (
-              <div className="text-center py-12 text-muted-foreground border border-dashed rounded-lg">
-                <p className="text-sm">Nenhum comentário ainda.</p>
-                <p className="text-xs mt-1">Seja o primeiro a comentar! 💬</p>
-              </div>
-            )}
+        {comments.length === 0 && (
+          <div className="text-center py-12 text-muted-foreground border border-dashed rounded-lg">
+            <p className="text-sm">Nenhum comentário ainda.</p>
+            <p className="text-xs mt-1">Seja o primeiro a comentar! 💬</p>
           </div>
-        </>
-      )}
+        )}
+      </div>
     </div>
   );
 }

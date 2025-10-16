@@ -738,6 +738,7 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          email: string | null
           id: string
           name: string
           role: Database["public"]["Enums"]["role_t"]
@@ -746,6 +747,7 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          email?: string | null
           id: string
           name: string
           role?: Database["public"]["Enums"]["role_t"]
@@ -754,6 +756,7 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string
+          email?: string | null
           id?: string
           name?: string
           role?: Database["public"]["Enums"]["role_t"]

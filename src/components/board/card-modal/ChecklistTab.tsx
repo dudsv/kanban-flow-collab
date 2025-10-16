@@ -15,10 +15,9 @@ type Checklist = Database['public']['Tables']['checklists']['Row'] & {
 
 interface ChecklistTabProps {
   card: BoardCard;
-  onUpdate: () => void;
 }
 
-export function ChecklistTab({ card, onUpdate }: ChecklistTabProps) {
+export function ChecklistTab({ card }: ChecklistTabProps) {
   const [checklists, setChecklists] = useState<Checklist[]>([]);
   const [newChecklistTitle, setNewChecklistTitle] = useState('');
   const [newItemTitle, setNewItemTitle] = useState<Record<string, string>>({});
