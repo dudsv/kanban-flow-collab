@@ -899,6 +899,14 @@ export type Database = {
         Args: { pid: string }
         Returns: boolean
       }
+      is_project_admin_member: {
+        Args: { pid: string; uid: string }
+        Returns: boolean
+      }
+      is_project_member: {
+        Args: { pid: string; uid: string }
+        Returns: boolean
+      }
       is_superadmin: {
         Args: { uid: string }
         Returns: boolean
