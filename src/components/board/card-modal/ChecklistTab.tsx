@@ -179,41 +179,47 @@ export function ChecklistTab({ card, onUpdate }: ChecklistTabProps) {
               ))}
             </div>
 
-            {/* Add Item */}
-            <div className="flex gap-2">
-              <Input
-                placeholder="Adicionar item..."
-                value={newItemTitle[checklist.id] || ''}
-                onChange={(e) =>
-                  setNewItemTitle(prev => ({ ...prev, [checklist.id]: e.target.value }))
-                }
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') createItem(checklist.id);
-                }}
-              />
-              <Button size="sm" onClick={() => createItem(checklist.id)}>
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
+        {/* Add Item */}
+        <form 
+          onSubmit={(e) => {
+            e.preventDefault();
+            createItem(checklist.id);
+          }}
+          className="flex gap-2"
+        >
+          <Input
+            placeholder="Adicionar item..."
+            value={newItemTitle[checklist.id] || ''}
+            onChange={(e) =>
+              setNewItemTitle(prev => ({ ...prev, [checklist.id]: e.target.value }))
+            }
+          />
+          <Button type="submit" size="sm">
+            <Plus className="h-4 w-4" />
+          </Button>
+        </form>
           </div>
         );
       })}
 
       {/* Add Checklist */}
-      <div className="flex gap-2">
+      <form 
+        onSubmit={(e) => {
+          e.preventDefault();
+          createChecklist();
+        }}
+        className="flex gap-2"
+      >
         <Input
           placeholder="Nome da nova checklist..."
           value={newChecklistTitle}
           onChange={(e) => setNewChecklistTitle(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') createChecklist();
-          }}
         />
-        <Button onClick={createChecklist}>
+        <Button type="submit">
           <Plus className="h-4 w-4 mr-2" />
           Adicionar Checklist
         </Button>
-      </div>
+      </form>
 
       {checklists.length === 0 && (
         <div className="text-center py-12 text-muted-foreground">

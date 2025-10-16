@@ -16,6 +16,7 @@ export interface FileItem {
   mime_type: string | null;
   size_bytes: number | null;
   folder_id: string | null;
+  card_id: string | null;
   project_id: string;
   uploaded_by: string | null;
   created_at: string;
@@ -77,7 +78,11 @@ export function useFiles(projectId: string) {
     return data as Folder;
   }, [projectId, toast]);
 
-  const uploadFiles = useCallback(async (files: File[], folderId: string | null = null) => {
+  const uploadFiles = useCallback(async (
+    files: File[], 
+    folderId: string | null = null,
+    cardId: string | null = null
+  ) => {
     setLoading(true);
     const results = [];
 
@@ -86,7 +91,9 @@ export function useFiles(projectId: string) {
       setUploadProgress(prev => ({ ...prev, [fileId]: 0 }));
 
       try {
-        const path = `${projectId}/${folderId ? `folder-${folderId}/` : ''}${file.name}`;
+        const path = cardId
+          ? `${projectId}/cards/${cardId}/${crypto.randomUUID()}-${file.name}`
+          : `${projectId}/${folderId ? `folder-${folderId}/` : ''}${file.name}`;
         
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('project-files')
@@ -96,7 +103,6 @@ export function useFiles(projectId: string) {
 
         if (uploadError) throw uploadError;
 
-        // Insert file record with exact storage path
         const { data: fileData, error: fileError } = await supabase
           .from('files')
           .insert({
@@ -105,6 +111,7 @@ export function useFiles(projectId: string) {
             mime_type: file.type,
             size_bytes: file.size,
             folder_id: folderId,
+            card_id: cardId,
             project_id: projectId
           })
           .select()

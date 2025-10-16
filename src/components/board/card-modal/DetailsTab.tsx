@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
-import { Calendar, Flag, Hash, Users, Check } from 'lucide-react';
+import { Calendar, Flag, Hash, Users, Check, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,6 +18,18 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { DialogFooter } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
 import { TagManager } from './TagManager';
 import type { BoardCard } from '@/hooks/useBoard';
@@ -50,7 +62,7 @@ export function DetailsTab({ mode, card, projectId, columnId, tags, onUpdate, on
   const [title, setTitle] = useState(mode === 'edit' ? card?.title || '' : '');
   const [priority, setPriority] = useState<Priority | undefined>(mode === 'edit' ? card?.priority || undefined : 'medium');
   const [dueDate, setDueDate] = useState(mode === 'edit' ? card?.due_at || '' : '');
-  const [points, setPoints] = useState(mode === 'edit' ? card?.points?.toString() || '' : '');
+  const [points, setPoints] = useState<number | null>(mode === 'edit' ? card?.points || null : null);
   const [projectMembers, setProjectMembers] = useState<any[]>([]);
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>(mode === 'edit' ? card?.assignees?.map(a => a.user_id) || [] : []);
   const [selectedTags, setSelectedTags] = useState<string[]>(mode === 'edit' ? card?.tags?.map(t => t.tag_id) || [] : []);
@@ -91,85 +103,115 @@ export function DetailsTab({ mode, card, projectId, columnId, tags, onUpdate, on
 
   const handleSave = async () => {
     if (!title.trim()) {
-      toast({
-        title: 'Título obrigatório',
-        description: 'Por favor, insira um título para o card.',
-        variant: 'destructive'
-      });
+      toast({ title: 'Erro', description: 'O título não pode estar vazio', variant: 'destructive' });
       return;
     }
 
     setSaving(true);
     try {
-      const { data: user } = await supabase.auth.getUser();
-      if (!user.user) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
 
       if (mode === 'create') {
-        // INSERT novo card
+        if (!columnId) throw new Error('Column ID não fornecido');
+
         const { data: newCard, error } = await supabase
           .from('cards')
           .insert({
             project_id: projectId,
-            column_id: columnId!,
-            title,
+            column_id: columnId,
+            title: title.trim(),
             description: editor?.getHTML() || '',
-            priority,
+            priority: priority || 'medium',
+            points: points || null,
             due_at: dueDate || null,
-            points: points ? parseInt(points) : null,
-            created_by: user.user.id
+            created_by: user.id
           })
-          .select()
+          .select('*')
           .single();
 
-        if (error) throw error;
-
-        // Inserir tags
-        if (selectedTags.length > 0) {
-          await supabase.from('card_tags').insert(
-            selectedTags.map(tagId => ({ card_id: newCard.id, tag_id: tagId }))
-          );
+        if (error) {
+          console.error('Create card error:', error);
+          throw new Error(error.message);
         }
 
-        // Inserir assignees
         if (selectedAssignees.length > 0) {
           await supabase.from('card_assignees').insert(
-            selectedAssignees.map(userId => ({ card_id: newCard.id, user_id: userId }))
+            selectedAssignees.map(uid => ({ card_id: newCard.id, user_id: uid }))
+          );
+        }
+        if (selectedTags.length > 0) {
+          await supabase.from('card_tags').insert(
+            selectedTags.map(tid => ({ card_id: newCard.id, tag_id: tid }))
           );
         }
 
-        toast({
-          title: 'Card criado',
-          description: 'O card foi criado com sucesso.'
-        });
-
+        toast({ title: 'Card criado com sucesso!' });
         onCreated?.();
         onClose?.();
       } else {
-        // UPDATE card existente
-        const { error } = await supabase
-          .from('cards')
-          .update({
-            title,
-            description: editor?.getHTML(),
-            priority,
-            due_at: dueDate || null,
-            points: points ? parseInt(points) : null,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', card!.id);
+        if (!card) throw new Error('Card não encontrado');
 
-        if (error) throw error;
+        const payload: any = {};
+        if (title !== card.title) payload.title = title.trim();
+        if (editor && editor.getHTML() !== card.description) {
+          payload.description = editor.getHTML();
+        }
+        if (priority !== card.priority) payload.priority = priority;
+        if (points !== card.points) payload.points = points;
+        if (dueDate !== card.due_at) payload.due_at = dueDate;
 
-        toast({
-          title: 'Card atualizado',
-          description: 'As alterações foram salvas com sucesso.'
-        });
+        if (Object.keys(payload).length > 0) {
+          const { error } = await supabase
+            .from('cards')
+            .update(payload)
+            .eq('id', card.id);
+
+          if (error) {
+            console.error('Update card error:', error);
+            throw new Error(error.message);
+          }
+        }
+
+        const currentAssigneeIds = card.assignees?.map(a => a.user_id) || [];
+        const toAdd = selectedAssignees.filter(id => !currentAssigneeIds.includes(id));
+        const toRemove = currentAssigneeIds.filter(id => !selectedAssignees.includes(id));
+
+        if (toAdd.length > 0) {
+          await supabase.from('card_assignees').insert(
+            toAdd.map(uid => ({ card_id: card.id, user_id: uid }))
+          );
+        }
+        if (toRemove.length > 0) {
+          await supabase.from('card_assignees')
+            .delete()
+            .eq('card_id', card.id)
+            .in('user_id', toRemove);
+        }
+
+        const currentTagIds = card.tags?.map(t => t.tag_id) || [];
+        const tagsToAdd = selectedTags.filter(id => !currentTagIds.includes(id));
+        const tagsToRemove = currentTagIds.filter(id => !selectedTags.includes(id));
+
+        if (tagsToAdd.length > 0) {
+          await supabase.from('card_tags').insert(
+            tagsToAdd.map(tid => ({ card_id: card.id, tag_id: tid }))
+          );
+        }
+        if (tagsToRemove.length > 0) {
+          await supabase.from('card_tags')
+            .delete()
+            .eq('card_id', card.id)
+            .in('tag_id', tagsToRemove);
+        }
+
+        toast({ title: 'Alterações salvas!' });
       }
-    } catch (error) {
-      console.error('Error saving card:', error);
+    } catch (error: any) {
+      console.error('Save error:', error);
       toast({
-        title: mode === 'create' ? 'Erro ao criar' : 'Erro ao atualizar',
-        description: mode === 'create' ? 'Não foi possível criar o card.' : 'Não foi possível salvar as alterações.',
+        title: 'Erro ao salvar',
+        description: error.message || 'Tente novamente',
         variant: 'destructive'
       });
     } finally {
@@ -177,14 +219,35 @@ export function DetailsTab({ mode, card, projectId, columnId, tags, onUpdate, on
     }
   };
 
+  const handleDelete = async () => {
+    if (!card) return;
+    
+    try {
+      const { error } = await supabase
+        .from('cards')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', card.id);
+
+      if (error) throw error;
+
+      toast({ title: 'Card movido para lixeira' });
+      onClose?.();
+    } catch (error: any) {
+      console.error('Delete error:', error);
+      toast({
+        title: 'Erro ao excluir',
+        description: error.message,
+        variant: 'destructive'
+      });
+    }
+  };
+
   const toggleTag = async (tagId: string) => {
     if (mode === 'create') {
-      // Em modo criar, só atualiza estado local
       setSelectedTags(prev =>
         prev.includes(tagId) ? prev.filter(id => id !== tagId) : [...prev, tagId]
       );
     } else {
-      // Em modo editar, faz chamada ao banco
       try {
         const isSelected = selectedTags.includes(tagId);
         if (isSelected) {
@@ -208,12 +271,10 @@ export function DetailsTab({ mode, card, projectId, columnId, tags, onUpdate, on
 
   const toggleAssignee = async (userId: string) => {
     if (mode === 'create') {
-      // Em modo criar, só atualiza estado local
       setSelectedAssignees(prev =>
         prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
       );
     } else {
-      // Em modo editar, faz chamada ao banco
       try {
         const isAssigned = selectedAssignees.includes(userId);
         if (isAssigned) {
@@ -237,6 +298,7 @@ export function DetailsTab({ mode, card, projectId, columnId, tags, onUpdate, on
 
   return (
     <div className="space-y-6">
+      
       {/* Title */}
       <div className="space-y-2">
         <Label htmlFor="title">Título</Label>
@@ -294,8 +356,8 @@ export function DetailsTab({ mode, card, projectId, columnId, tags, onUpdate, on
             <Input
               id="points"
               type="number"
-              value={points}
-              onChange={(e) => setPoints(e.target.value)}
+              value={points || ''}
+              onChange={(e) => setPoints(e.target.value ? parseInt(e.target.value) : null)}
               placeholder="0"
               className="pl-9"
             />
@@ -430,10 +492,38 @@ export function DetailsTab({ mode, card, projectId, columnId, tags, onUpdate, on
         </div>
       </div>
 
-      {/* Save Button */}
-      <Button onClick={handleSave} disabled={saving} className="w-full">
-        {saving ? 'Salvando...' : mode === 'create' ? 'Criar Card' : 'Salvar alterações'}
-      </Button>
+      <DialogFooter className="flex justify-between items-center">
+        <div>
+          {mode === 'edit' && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm">
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Excluir card
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    O card será movido para a lixeira. Você pode restaurá-lo depois.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDelete}>
+                    Excluir
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
+
+        <Button onClick={handleSave} disabled={saving}>
+          {saving ? 'Salvando...' : mode === 'create' ? 'Criar Card' : 'Salvar alterações'}
+        </Button>
+      </DialogFooter>
     </div>
   );
 }

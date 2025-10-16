@@ -136,6 +136,38 @@ export function AttachmentsTab({ card, projectId, onUpdate }: AttachmentsTabProp
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  const viewFile = async (file: FileItem) => {
+    const { data, error } = await supabase.storage
+      .from('project-files')
+      .createSignedUrl(file.url, 3600);
+
+    if (!error && data?.signedUrl) {
+      const win = window.open(data.signedUrl, '_blank');
+      if (!win || win.closed || typeof win.closed === 'undefined') {
+        toast({
+          title: 'Preview bloqueado',
+          description: 'Por favor, permita pop-ups ou baixe o arquivo',
+          variant: 'destructive'
+        });
+      }
+    }
+  };
+
+  const downloadFile = async (file: FileItem) => {
+    const { data, error } = await supabase.storage
+      .from('project-files')
+      .createSignedUrl(file.url, 3600, { download: true });
+
+    if (!error && data?.signedUrl) {
+      const a = document.createElement('a');
+      a.href = data.signedUrl;
+      a.download = file.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+  };
+
   const isImage = (mimeType: string | null) => {
     return mimeType?.startsWith('image/');
   };
@@ -194,15 +226,7 @@ export function AttachmentsTab({ card, projectId, onUpdate }: AttachmentsTabProp
                 <Button
                   size="icon"
                   variant="ghost"
-                  onClick={async () => {
-                    const { data, error } = await supabase.storage
-                      .from('project-files')
-                      .createSignedUrl(file.url, 3600);
-                    
-                    if (!error && data?.signedUrl) {
-                      window.open(data.signedUrl, '_blank');
-                    }
-                  }}
+                  onClick={() => viewFile(file)}
                   title="Visualizar"
                 >
                   <Eye className="h-4 w-4" />
@@ -211,15 +235,7 @@ export function AttachmentsTab({ card, projectId, onUpdate }: AttachmentsTabProp
               <Button
                 size="icon"
                 variant="ghost"
-                onClick={async () => {
-                  const { data, error } = await supabase.storage
-                    .from('project-files')
-                    .createSignedUrl(file.url, 3600);
-                  
-                  if (!error && data?.signedUrl) {
-                    window.open(data.signedUrl, '_blank');
-                  }
-                }}
+                onClick={() => downloadFile(file)}
                 title="Download"
               >
                 <Download className="h-4 w-4" />

@@ -3,12 +3,16 @@ import { supabase } from '@/integrations/supabase/client';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Mention from '@tiptap/extension-mention';
+import Placeholder from '@tiptap/extension-placeholder';
 import { Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { ReactRenderer } from '@tiptap/react';
+import tippy, { Instance as TippyInstance } from 'tippy.js';
+import 'tippy.js/dist/tippy.css';
 import type { BoardCard } from '@/hooks/useBoard';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -28,70 +32,99 @@ export function CommentsTab({ card, projectId, onUpdate }: CommentsTabProps) {
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
 
+  const MentionList = ({ items, command }: any) => {
+    const [selectedIndex, setSelectedIndex] = useState(0);
+
+    const selectItem = (index: number) => {
+      const item = items[index];
+      if (item) {
+        command({ id: item.user_id, label: item.profiles?.name });
+      }
+    };
+
+    return (
+      <div className="bg-popover border rounded-md shadow-md p-1 space-y-1 max-h-60 overflow-y-auto">
+        {items.length === 0 ? (
+          <div className="px-2 py-1 text-sm text-muted-foreground">
+            Nenhum membro encontrado
+          </div>
+        ) : (
+          items.map((item: any, index: number) => (
+            <button
+              key={item.user_id}
+              className={`w-full px-2 py-1.5 text-sm rounded flex items-center gap-2 ${
+                index === selectedIndex ? 'bg-accent' : 'hover:bg-accent/50'
+              }`}
+              onClick={() => selectItem(index)}
+            >
+              <Avatar className="h-6 w-6">
+                <AvatarImage src={item.profiles?.avatar_url || ''} />
+                <AvatarFallback>
+                  {(item.profiles?.name || 'U').substring(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <span>{item.profiles?.name || 'Sem nome'}</span>
+            </button>
+          ))
+        )}
+      </div>
+    );
+  };
+
   const editor = useEditor({
     extensions: [
       StarterKit,
+      Placeholder.configure({ placeholder: 'Escreva um comentário...' }),
       Mention.configure({
-        HTMLAttributes: {
-          class: 'mention'
-        },
+        HTMLAttributes: { class: 'mention bg-primary/10 text-primary px-1 rounded' },
         suggestion: {
-          items: ({ query }) => {
-            return projectMembers
-              .filter(m => m.profiles.name.toLowerCase().includes(query.toLowerCase()))
-              .slice(0, 5);
-          },
+          items: ({ query }) =>
+            projectMembers
+              .filter(m => m.profiles?.name.toLowerCase().includes(query.toLowerCase()))
+              .slice(0, 5),
           render: () => {
-            let component: any;
-            let popup: any;
+            let component: ReactRenderer;
+            let popup: TippyInstance[];
 
             return {
               onStart: (props: any) => {
-                component = document.createElement('div');
-                component.className = 'mention-suggestions';
-                
-                const items = props.items.map((item: any) => {
-                  const div = document.createElement('div');
-                  div.className = 'mention-item';
-                  div.textContent = item.profiles.name;
-                  div.addEventListener('click', () => props.command({ id: item.user_id, label: item.profiles.name }));
-                  return div;
+                component = new ReactRenderer(MentionList, {
+                  props,
+                  editor: props.editor,
                 });
 
-                items.forEach((item: any) => component.appendChild(item));
-                document.body.appendChild(component);
-                popup = component;
+                popup = tippy('body', {
+                  getReferenceClientRect: props.clientRect,
+                  appendTo: () => document.body,
+                  content: component.element,
+                  showOnCreate: true,
+                  interactive: true,
+                  trigger: 'manual',
+                  placement: 'bottom-start',
+                });
               },
               onUpdate: (props: any) => {
-                const items = props.items.map((item: any) => {
-                  const div = document.createElement('div');
-                  div.className = 'mention-item';
-                  div.textContent = item.profiles.name;
-                  div.addEventListener('click', () => props.command({ id: item.user_id, label: item.profiles.name }));
-                  return div;
+                component.updateProps(props);
+                popup[0].setProps({
+                  getReferenceClientRect: props.clientRect,
                 });
-
-                if (popup) {
-                  popup.innerHTML = '';
-                  items.forEach((item: any) => popup.appendChild(item));
+              },
+              onKeyDown: (props: any) => {
+                if (props.event.key === 'Escape') {
+                  popup[0].hide();
+                  return true;
                 }
+                return (component.ref as any)?.onKeyDown?.(props) ?? false;
               },
               onExit: () => {
-                if (popup) {
-                  popup.remove();
-                }
-              }
+                popup[0].destroy();
+                component.destroy();
+              },
             };
-          }
-        }
-      })
+          },
+        },
+      }),
     ],
-    content: '',
-    editorProps: {
-      attributes: {
-        class: 'prose prose-sm max-w-none focus:outline-none min-h-[80px] p-3 border rounded-md'
-      }
-    }
   });
 
   useEffect(() => {
@@ -139,9 +172,15 @@ export function CommentsTab({ card, projectId, onUpdate }: CommentsTabProps) {
     setPosting(true);
     try {
       const { data: user } = await supabase.auth.getUser();
-      if (!user.user) return;
+      if (!user.user) {
+        toast({
+          title: 'Erro',
+          description: 'Você precisa estar autenticado',
+          variant: 'destructive'
+        });
+        return;
+      }
 
-      // Insert comment
       const { data: comment, error } = await supabase
         .from('comments')
         .insert({
@@ -149,59 +188,40 @@ export function CommentsTab({ card, projectId, onUpdate }: CommentsTabProps) {
           author_id: user.user.id,
           body: content
         })
-        .select()
+        .select('id, created_at, body, author_id')
         .single();
 
-      if (error) throw error;
-
-      // Extract mentions from content
-      const mentionRegex = /@\[([^\]]+)\]\(([^)]+)\)/g;
-      const mentions = [...content.matchAll(mentionRegex)];
-      
-      if (mentions.length > 0) {
-        // Insert mentions
-        const mentionInserts = mentions.map(match => ({
-          comment_id: comment.id,
-          mentioned_user_id: match[2]
-        }));
-
-        await supabase.from('comment_mentions').insert(mentionInserts);
-
-        // Create notifications
-        const notificationInserts = mentions.map(match => ({
-          user_id: match[2],
-          type: 'mention_comment',
-          payload: {
-            comment_id: comment.id,
-            card_id: card.id,
-            card_title: card.title,
-            author_name: user.user.email
-          }
-        }));
-
-        await supabase.from('notifications').insert(notificationInserts);
+      if (error) {
+        console.error('Comment error:', error);
+        throw error;
       }
 
-      // Audit log
-      await supabase.from('audit_log').insert({
-        entity: 'comment',
-        action: 'create',
-        project_id: projectId,
-        actor_id: user.user.id
-      });
+      const mentionedIds = Array.from(content.matchAll(/data-user-id="([^"]+)"/g)).map(m => m[1]);
 
-      editor?.commands.clearContent();
+      if (mentionedIds.length > 0) {
+        await supabase.from('comment_mentions')
+          .insert(mentionedIds.map(uid => ({ comment_id: comment.id, mentioned_user_id: uid })));
+
+        await supabase.from('notifications')
+          .insert(mentionedIds.map(uid => ({
+            user_id: uid,
+            type: 'mention',
+            payload: { projectId, cardId: card.id, commentId: comment.id }
+          })));
+      }
+
+      editor.commands.clearContent();
       loadComments();
 
       toast({
         title: 'Comentário adicionado',
         description: 'Seu comentário foi publicado com sucesso.'
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error posting comment:', error);
       toast({
         title: 'Erro ao comentar',
-        description: 'Não foi possível adicionar o comentário.',
+        description: error.message || 'Tente novamente',
         variant: 'destructive'
       });
     } finally {

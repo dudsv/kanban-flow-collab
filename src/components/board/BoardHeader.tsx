@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Tag, Users, Flag, FolderOpen, Settings, Download, Trash2 } from 'lucide-react';
+import { Search, Tag, Users, Flag, FolderOpen, Settings, Download, Trash2, Plus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,8 @@ interface BoardHeaderProps {
   onPrioritiesChange: (priorities: string[]) => void;
   selectedAssignees: string[];
   onAssigneesChange: (assignees: string[]) => void;
+  columns?: Array<{ id: string; name: string }>;
+  onAddCard?: (columnId: string) => void;
 }
 
 export function BoardHeader({
@@ -40,7 +42,9 @@ export function BoardHeader({
   selectedPriorities,
   onPrioritiesChange,
   selectedAssignees,
-  onAssigneesChange
+  onAssigneesChange,
+  columns,
+  onAddCard
 }: BoardHeaderProps) {
   const priorities = ['low', 'medium', 'high', 'critical'];
   const navigate = useNavigate();
@@ -54,6 +58,22 @@ export function BoardHeader({
       
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 py-4">
       <div className="flex items-center gap-4 flex-wrap">
+        {/* Botão Adicionar Card - DESTAQUE */}
+        {onAddCard && columns && columns.length > 0 && (
+          <Button 
+            className="bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 text-primary-foreground"
+            onClick={() => {
+              const firstColumn = columns[0];
+              if (firstColumn) {
+                onAddCard(firstColumn.id);
+              }
+            }}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Adicionar card
+          </Button>
+        )}
+        
         {/* Action Buttons */}
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => navigate(`/projects/${projectId}/settings`)} title="Configurações">

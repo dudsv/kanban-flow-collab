@@ -168,6 +168,8 @@ export default function Board() {
           onPrioritiesChange={setSelectedPriorities}
           selectedAssignees={selectedAssignees}
           onAssigneesChange={setSelectedAssignees}
+          columns={columns}
+          onAddCard={(columnId) => setCreateContext({ columnId })}
         />
 
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
