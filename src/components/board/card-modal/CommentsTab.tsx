@@ -192,7 +192,6 @@ export function CommentsTab({ card, projectId, onUpdate }: CommentsTabProps) {
 
       editor?.commands.clearContent();
       loadComments();
-      onUpdate();
 
       toast({
         title: 'Comentário adicionado',

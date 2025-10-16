@@ -81,7 +81,6 @@ export function AttachmentsTab({ card, projectId, onUpdate }: AttachmentsTabProp
       });
 
       loadFiles();
-      onUpdate();
     } catch (error) {
       console.error('Error uploading files:', error);
       toast({
@@ -116,7 +115,6 @@ export function AttachmentsTab({ card, projectId, onUpdate }: AttachmentsTabProp
       });
 
       loadFiles();
-      onUpdate();
     } catch (error) {
       console.error('Error deleting file:', error);
       toast({
@@ -196,9 +194,14 @@ export function AttachmentsTab({ card, projectId, onUpdate }: AttachmentsTabProp
                 <Button
                   size="icon"
                   variant="ghost"
-                  onClick={() => {
-                    const { data } = supabase.storage.from('project-files').getPublicUrl(file.url);
-                    window.open(data.publicUrl, '_blank');
+                  onClick={async () => {
+                    const { data, error } = await supabase.storage
+                      .from('project-files')
+                      .createSignedUrl(file.url, 3600);
+                    
+                    if (!error && data?.signedUrl) {
+                      window.open(data.signedUrl, '_blank');
+                    }
                   }}
                   title="Visualizar"
                 >
@@ -208,9 +211,14 @@ export function AttachmentsTab({ card, projectId, onUpdate }: AttachmentsTabProp
               <Button
                 size="icon"
                 variant="ghost"
-                onClick={() => {
-                  const { data } = supabase.storage.from('project-files').getPublicUrl(file.url);
-                  window.open(data.publicUrl, '_blank');
+                onClick={async () => {
+                  const { data, error } = await supabase.storage
+                    .from('project-files')
+                    .createSignedUrl(file.url, 3600);
+                  
+                  if (!error && data?.signedUrl) {
+                    window.open(data.signedUrl, '_blank');
+                  }
                 }}
                 title="Download"
               >

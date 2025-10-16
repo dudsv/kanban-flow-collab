@@ -18,36 +18,35 @@ import type { Database } from '@/integrations/supabase/types';
 type Tag = Database['public']['Tables']['tags']['Row'];
 
 interface CardModalProps {
-  card: BoardCard | null;
+  mode: 'create' | 'edit';
+  card?: BoardCard | null;
   projectId: string;
+  columnId?: string;
   tags: Tag[];
   onClose: () => void;
-  onUpdate: () => void;
-  onSave?: (card: Partial<BoardCard>) => void;
-  isCreating?: boolean;
+  onUpdate?: () => void;
+  onCreated?: () => void;
 }
 
-export function CardModal({ card, projectId, tags, onClose, onUpdate, onSave, isCreating }: CardModalProps) {
+export function CardModal({ mode, card, projectId, columnId, tags, onClose, onUpdate, onCreated }: CardModalProps) {
   const [activeTab, setActiveTab] = useState('details');
-
-  if (!card) return null;
 
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-xl">
-            {isCreating ? 'Criar Novo Card' : card.title}
+            {mode === 'create' ? 'Criar Novo Card' : card?.title}
           </DialogTitle>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
-          <TabsList className={isCreating ? 'grid w-full grid-cols-1' : 'grid w-full grid-cols-5'}>
+          <TabsList className={mode === 'create' ? 'grid w-full grid-cols-1' : 'grid w-full grid-cols-5'}>
             <TabsTrigger value="details" className="flex items-center gap-2">
               <Info className="h-4 w-4" />
               Detalhes
             </TabsTrigger>
-            {!isCreating && (
+            {mode === 'edit' && (
               <>
                 <TabsTrigger value="checklist" className="flex items-center gap-2">
                   <CheckSquare className="h-4 w-4" />
@@ -71,10 +70,19 @@ export function CardModal({ card, projectId, tags, onClose, onUpdate, onSave, is
 
           <div className="flex-1 overflow-y-auto mt-4">
             <TabsContent value="details" className="mt-0">
-              <DetailsTab card={card} projectId={projectId} tags={tags} onUpdate={onUpdate} />
+              <DetailsTab 
+                mode={mode}
+                card={card}
+                projectId={projectId}
+                columnId={columnId}
+                tags={tags}
+                onUpdate={onUpdate}
+                onCreated={onCreated}
+                onClose={onClose}
+              />
             </TabsContent>
 
-            {!isCreating && (
+            {mode === 'edit' && card && (
               <>
                 <TabsContent value="checklist" className="mt-0">
                   <ChecklistTab card={card} onUpdate={onUpdate} />
