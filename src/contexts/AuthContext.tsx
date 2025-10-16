@@ -56,19 +56,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     if (!error && data.user) {
-      // Create profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert({
-          id: data.user.id,
-          name,
-          role: 'user'
-        });
-
-      if (profileError) {
-        console.error('Profile creation error:', profileError);
-      }
-
       toast({
         title: "Bem-vindo ao KanFlow!",
         description: "Sua conta foi criada com sucesso.",
