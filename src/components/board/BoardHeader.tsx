@@ -1,7 +1,8 @@
-import { Search, Tag, Users, Flag } from 'lucide-react';
+import { Search, Tag, Users, Flag, FolderOpen } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
 import {
   Select,
   SelectContent,
@@ -27,6 +28,7 @@ interface BoardHeaderProps {
 }
 
 export function BoardHeader({
+  projectId,
   searchQuery,
   onSearchChange,
   tags,
@@ -42,6 +44,14 @@ export function BoardHeader({
   return (
     <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 py-4">
       <div className="flex items-center gap-4 flex-wrap">
+        {/* Files Link */}
+        <Link to={`/projects/${projectId}/files`}>
+          <Button variant="outline" size="sm">
+            <FolderOpen className="h-4 w-4 mr-2" />
+            Files
+          </Button>
+        </Link>
+
         {/* Search */}
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

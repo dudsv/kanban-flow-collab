@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Home, Users, LogOut, Moon, Sun, Folder } from 'lucide-react';
+import { Home, Users, LogOut, Moon, Sun, Folder, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface AppLayoutProps {
@@ -54,6 +54,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
           nextKey.then((key) => {
             if (key === 'p' || key === 'P') navigate('/projects');
+            if (key === 'c' || key === 'C') navigate('/chat');
           });
         }, 0);
       }
@@ -66,6 +67,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const navItems = [
     { path: '/projects', label: 'Projetos', icon: Folder },
     { path: '/people', label: 'Pessoas', icon: Users },
+    { path: '/chat', label: 'Chat', icon: MessageSquare },
   ];
 
   return (
