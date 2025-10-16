@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useConversations, type Conversation } from '@/hooks/useConversations';
 import { useMessages } from '@/hooks/useMessages';
 import { useChatRealtime } from '@/hooks/useChatRealtime';
@@ -16,6 +17,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Chat() {
+  const [searchParams] = useSearchParams();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -79,6 +81,17 @@ export default function Chat() {
   useEffect(() => {
     loadConversationsList();
   }, [loadConversationsList]);
+
+  // Auto-select conversation from URL params
+  useEffect(() => {
+    const conversationId = searchParams.get('conversation');
+    if (conversationId && conversations.length > 0) {
+      const conv = conversations.find(c => c.id === conversationId);
+      if (conv) {
+        setSelectedConversation(conv);
+      }
+    }
+  }, [searchParams, conversations]);
 
   useEffect(() => {
     if (selectedConversation?.id) {

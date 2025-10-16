@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePresence } from '@/hooks/usePresence';
@@ -20,9 +21,11 @@ interface Profile {
 
 export default function People() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [creatingDM, setCreatingDM] = useState<string | null>(null);
 
   const { onlineUsers } = usePresence('presence:people', user?.id, {
     name: user?.user_metadata?.name,
@@ -54,11 +57,77 @@ export default function People() {
     profile.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleStartDM = (profileId: string) => {
-    toast({
-      title: "DM Feature",
-      description: "Chat será implementado no próximo prompt!",
-    });
+  const handleStartDM = async (profileId: string) => {
+    if (!user || profileId === user.id) return;
+    
+    setCreatingDM(profileId);
+    try {
+      // Check if DM conversation already exists
+      const { data: existingConvs, error: searchError } = await supabase
+        .from('conversations')
+        .select('id, conversation_members!inner(user_id)')
+        .eq('type', 'dm');
+
+      if (searchError) throw searchError;
+
+      // Find DM with exactly these 2 users
+      let conversationId: string | null = null;
+      
+      for (const conv of existingConvs || []) {
+        const { data: members } = await supabase
+          .from('conversation_members')
+          .select('user_id')
+          .eq('conversation_id', conv.id);
+        
+        const memberIds = members?.map(m => m.user_id) || [];
+        if (
+          memberIds.length === 2 &&
+          memberIds.includes(user.id) &&
+          memberIds.includes(profileId)
+        ) {
+          conversationId = conv.id;
+          break;
+        }
+      }
+
+      // Create new DM if doesn't exist
+      if (!conversationId) {
+        const { data: newConv, error: convError } = await supabase
+          .from('conversations')
+          .insert({
+            type: 'dm',
+            created_by: user.id
+          })
+          .select()
+          .single();
+
+        if (convError) throw convError;
+
+        // Add both users as members
+        const { error: membersError } = await supabase
+          .from('conversation_members')
+          .insert([
+            { conversation_id: newConv.id, user_id: user.id },
+            { conversation_id: newConv.id, user_id: profileId }
+          ]);
+
+        if (membersError) throw membersError;
+        
+        conversationId = newConv.id;
+      }
+
+      // Navigate to chat with this conversation
+      navigate(`/chat?conversation=${conversationId}`);
+      
+    } catch (error: any) {
+      toast({
+        title: "Erro ao iniciar conversa",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setCreatingDM(null);
+    }
   };
 
   return (
@@ -127,6 +196,7 @@ export default function People() {
                         size="icon"
                         variant="ghost"
                         onClick={() => handleStartDM(profile.id)}
+                        disabled={profile.id === user?.id || creatingDM === profile.id}
                       >
                         <MessageCircle className="h-4 w-4" />
                       </Button>
