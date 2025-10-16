@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -27,7 +27,7 @@ export function useFiles(projectId: string) {
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const { toast } = useToast();
 
-  const loadFolders = async () => {
+  const loadFolders = useCallback(async () => {
     const { data, error } = await supabase
       .from('folders')
       .select('*')
@@ -39,9 +39,9 @@ export function useFiles(projectId: string) {
       return [];
     }
     return data as Folder[];
-  };
+  }, [projectId, toast]);
 
-  const loadFiles = async (folderId?: string | null) => {
+  const loadFiles = useCallback(async (folderId?: string | null) => {
     let query = supabase
       .from('files')
       .select('*')
@@ -60,9 +60,9 @@ export function useFiles(projectId: string) {
       return [];
     }
     return data as FileItem[];
-  };
+  }, [projectId, toast]);
 
-  const createFolder = async (name: string, parentId: string | null = null) => {
+  const createFolder = useCallback(async (name: string, parentId: string | null = null) => {
     const { data, error } = await supabase
       .from('folders')
       .insert({ name, parent_id: parentId, project_id: projectId })
@@ -75,9 +75,9 @@ export function useFiles(projectId: string) {
     }
     toast({ title: 'Folder created', description: `"${name}" created successfully` });
     return data as Folder;
-  };
+  }, [projectId, toast]);
 
-  const uploadFiles = async (files: File[], folderId: string | null = null) => {
+  const uploadFiles = useCallback(async (files: File[], folderId: string | null = null) => {
     setLoading(true);
     const results = [];
 
@@ -129,9 +129,9 @@ export function useFiles(projectId: string) {
       toast({ title: 'Upload complete', description: `${results.length} file(s) uploaded` });
     }
     return results;
-  };
+  }, [projectId, toast]);
 
-  const moveFile = async (fileId: string, targetFolderId: string | null) => {
+  const moveFile = useCallback(async (fileId: string, targetFolderId: string | null) => {
     const { data: file, error: fetchError } = await supabase
       .from('files')
       .select('*')
@@ -171,9 +171,9 @@ export function useFiles(projectId: string) {
 
     toast({ title: 'File moved', description: 'File moved successfully' });
     return true;
-  };
+  }, [projectId, toast]);
 
-  const deleteFile = async (fileId: string) => {
+  const deleteFile = useCallback(async (fileId: string) => {
     const { error } = await supabase
       .from('files')
       .update({ deleted_at: new Date().toISOString() })
@@ -186,7 +186,7 @@ export function useFiles(projectId: string) {
 
     toast({ title: 'File deleted', description: 'File moved to trash' });
     return true;
-  };
+  }, [toast]);
 
   return {
     loading,

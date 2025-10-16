@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -34,31 +34,7 @@ export default function Projects() {
     visibility: 'private' as 'public' | 'private',
   });
 
-  useEffect(() => {
-    loadProjects();
-
-    // Subscribe to realtime changes
-    const channel = supabase
-      .channel('projects-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'projects',
-        },
-        () => {
-          loadProjects();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  const loadProjects = async () => {
+  const loadProjects = useCallback(async () => {
     const { data, error } = await supabase
       .from('projects')
       .select('*')
@@ -75,7 +51,29 @@ export default function Projects() {
       setProjects(data || []);
     }
     setLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    loadProjects();
+
+    // Subscribe to realtime changes
+    const channel = supabase
+      .channel('projects-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'projects',
+        },
+        loadProjects
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loadProjects]);
 
   const handleCreateProject = async () => {
     if (!newProject.name.trim()) {

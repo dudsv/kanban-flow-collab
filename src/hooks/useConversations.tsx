@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -21,7 +21,7 @@ export function useConversations() {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const loadConversations = async () => {
+  const loadConversations = useCallback(async () => {
     const { data, error } = await supabase
       .from('conversations')
       .select('*')
@@ -32,9 +32,9 @@ export function useConversations() {
       return [];
     }
     return data as Conversation[];
-  };
+  }, [toast]);
 
-  const createConversation = async (
+  const createConversation = useCallback(async (
     type: 'dm' | 'group' | 'project' | 'card',
     options: { title?: string; projectId?: string; cardId?: string; memberIds?: string[] }
   ) => {
@@ -79,9 +79,9 @@ export function useConversations() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
-  const loadMembers = async (conversationId: string) => {
+  const loadMembers = useCallback(async (conversationId: string) => {
     const { data, error } = await supabase
       .from('conversation_members')
       .select('*, profiles(*)')
@@ -92,7 +92,7 @@ export function useConversations() {
       return [];
     }
     return data;
-  };
+  }, [toast]);
 
   return {
     loading,

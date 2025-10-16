@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -26,7 +26,7 @@ export function useMessages(conversationId: string) {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const loadMessages = async (limit = 50, before?: string) => {
+  const loadMessages = useCallback(async (limit = 50, before?: string) => {
     let query = supabase
       .from('messages')
       .select('*, profiles(*)')
@@ -46,9 +46,9 @@ export function useMessages(conversationId: string) {
       return [];
     }
     return data as Message[];
-  };
+  }, [conversationId, toast]);
 
-  const sendMessage = async (body: string, replyTo?: string) => {
+  const sendMessage = useCallback(async (body: string, replyTo?: string) => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -73,9 +73,9 @@ export function useMessages(conversationId: string) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [conversationId, toast]);
 
-  const addReaction = async (messageId: string, emoji: string) => {
+  const addReaction = useCallback(async (messageId: string, emoji: string) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return false;
 
@@ -88,9 +88,9 @@ export function useMessages(conversationId: string) {
       return false;
     }
     return true;
-  };
+  }, [toast]);
 
-  const removeReaction = async (reactionId: string) => {
+  const removeReaction = useCallback(async (reactionId: string) => {
     const { error } = await supabase
       .from('message_reactions')
       .delete()
@@ -101,9 +101,9 @@ export function useMessages(conversationId: string) {
       return false;
     }
     return true;
-  };
+  }, [toast]);
 
-  const markAsRead = async (messageId: string) => {
+  const markAsRead = useCallback(async (messageId: string) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
@@ -114,9 +114,9 @@ export function useMessages(conversationId: string) {
     if (error) {
       console.error('Mark as read error:', error);
     }
-  };
+  }, []);
 
-  const loadReactions = async (messageId: string) => {
+  const loadReactions = useCallback(async (messageId: string) => {
     const { data, error } = await supabase
       .from('message_reactions')
       .select('*')
@@ -127,7 +127,7 @@ export function useMessages(conversationId: string) {
       return [];
     }
     return data as MessageReaction[];
-  };
+  }, []);
 
   return {
     loading,

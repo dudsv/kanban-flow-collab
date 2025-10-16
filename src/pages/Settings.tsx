@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { VisibilitySection } from '@/components/settings/VisibilitySection';
@@ -17,22 +17,26 @@ export default function Settings() {
   const [project, setProject] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadProject = async () => {
+  const loadProject = useCallback(async () => {
     if (!projectId) return;
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('projects')
       .select('*')
       .eq('id', projectId)
-      .single();
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error loading project:', error);
+    }
 
     setProject(data);
     setLoading(false);
-  };
+  }, [projectId]);
 
   useEffect(() => {
     loadProject();
-  }, [projectId]);
+  }, [loadProject]);
 
   useSettingsRealtime(projectId!, loadProject);
 

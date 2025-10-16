@@ -26,12 +26,14 @@ export default function Files() {
     ]);
     setFolders(foldersData);
     setFiles(filesData);
-  }, [currentFolderId]);
+  }, [currentFolderId, loadFolders, loadFiles]);
 
   useFilesRealtime(projectId!, loadData);
 
   useEffect(() => {
-    if (projectId) loadData();
+    if (projectId) {
+      loadData();
+    }
   }, [projectId, loadData]);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -21,7 +21,11 @@ export default function Board() {
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   const [selectedPriorities, setSelectedPriorities] = useState<string[]>([]);
 
-  useBoardRealtime(projectId!, loadBoard);
+  const handleBoardUpdate = useCallback(() => {
+    loadBoard();
+  }, [loadBoard]);
+
+  useBoardRealtime(projectId!, handleBoardUpdate);
 
   useEffect(() => {
     if (projectId) {

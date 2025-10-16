@@ -22,11 +22,6 @@ export default function Chat() {
   const { loadMessages, sendMessage, markAsRead } = useMessages(selectedConversation?.id || '');
   const { typingUsers, setTyping } = useChatPresence(selectedConversation?.id || '');
 
-  const loadData = useCallback(async () => {
-    const convos = await loadConversations();
-    setConversations(convos);
-  }, [loadConversations]);
-
   const loadConversationMessages = useCallback(async () => {
     if (!selectedConversation) return;
     const msgs = await loadMessages();
@@ -41,14 +36,14 @@ export default function Chat() {
   useChatRealtime(selectedConversation?.id || '', loadConversationMessages);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    loadConversations().then(setConversations);
+  }, [loadConversations]);
 
   useEffect(() => {
-    if (selectedConversation) {
+    if (selectedConversation?.id) {
       loadConversationMessages();
     }
-  }, [selectedConversation, loadConversationMessages]);
+  }, [selectedConversation?.id, loadConversationMessages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
