@@ -25,6 +25,7 @@ export default function Chat() {
   const [loadingConvs, setLoadingConvs] = useState(true);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const loadConversationMessagesRef = useRef<() => Promise<void>>();
   const { toast } = useToast();
 
   const { loadConversations } = useConversations();
@@ -58,10 +59,20 @@ export default function Chat() {
     if (msgs.length > 0) {
       markAsRead(msgs[msgs.length - 1].id);
     }
-  }, [selectedConversation, loadMessages, markAsRead]);
+  }, [selectedConversation?.id, loadMessages, markAsRead]);
+
+  // Update ref for realtime callback
+  loadConversationMessagesRef.current = loadConversationMessages;
 
   // Realtime updates
-  useChatRealtime(selectedConversation?.id || '', loadConversationMessages);
+  useChatRealtime(selectedConversation?.id || '', () => {
+    loadConversationMessagesRef.current?.();
+  });
+
+  // Load conversations on mount
+  useEffect(() => {
+    loadConversationsList();
+  }, []);
 
   // Realtime for conversations list
   useEffect(() => {
@@ -78,10 +89,6 @@ export default function Chat() {
     return () => { supabase.removeChannel(channel); };
   }, [loadConversationsList]);
 
-  useEffect(() => {
-    loadConversationsList();
-  }, [loadConversationsList]);
-
   // Auto-select conversation from URL params
   useEffect(() => {
     const conversationId = searchParams.get('conversation');
@@ -93,11 +100,12 @@ export default function Chat() {
     }
   }, [searchParams, conversations]);
 
+  // Load messages when conversation changes
   useEffect(() => {
     if (selectedConversation?.id) {
       loadConversationMessages();
     }
-  }, [selectedConversation?.id, loadConversationMessages]);
+  }, [selectedConversation?.id]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
