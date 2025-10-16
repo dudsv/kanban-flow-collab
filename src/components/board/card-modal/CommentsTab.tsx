@@ -31,6 +31,7 @@ export function CommentsTab({ card, projectId, onUpdate }: CommentsTabProps) {
   const [projectMembers, setProjectMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
+  const [membersLoaded, setMembersLoaded] = useState(false);
 
   const MentionList = ({ items, command }: any) => {
     const [selectedIndex, setSelectedIndex] = useState(0);
@@ -78,20 +79,28 @@ export function CommentsTab({ card, projectId, onUpdate }: CommentsTabProps) {
       Mention.configure({
         HTMLAttributes: { class: 'mention bg-primary/10 text-primary px-1 rounded' },
         suggestion: {
-          items: ({ query }) =>
-            projectMembers
-              .filter(m => m.profiles?.name.toLowerCase().includes(query.toLowerCase()))
-              .slice(0, 5),
+          items: ({ query }) => {
+            console.log('🔍 Buscando membros para:', query, 'Total membros:', projectMembers.length);
+            const filtered = projectMembers
+              .filter(m => {
+                const name = m.profiles?.name?.toLowerCase() || '';
+                return name.includes(query.toLowerCase());
+              })
+              .slice(0, 5);
+            console.log('✅ Membros filtrados:', filtered.length);
+            return filtered;
+          },
           render: () => {
             let component: ReactRenderer;
             let popup: TippyInstance[];
 
             return {
-              onStart: (props: any) => {
-                component = new ReactRenderer(MentionList, {
-                  props,
-                  editor: props.editor,
-                });
+            onStart: (props: any) => {
+              console.log('📝 Mention started, items:', props.items?.length || 0);
+              component = new ReactRenderer(MentionList, {
+                props,
+                editor: props.editor,
+              });
 
                 popup = tippy('body', {
                   getReferenceClientRect: props.clientRect,
@@ -103,12 +112,13 @@ export function CommentsTab({ card, projectId, onUpdate }: CommentsTabProps) {
                   placement: 'bottom-start',
                 });
               },
-              onUpdate: (props: any) => {
-                component.updateProps(props);
-                popup[0].setProps({
-                  getReferenceClientRect: props.clientRect,
-                });
-              },
+            onUpdate: (props: any) => {
+              console.log('🔄 Mention updated, items:', props.items?.length || 0);
+              component.updateProps(props);
+              popup[0].setProps({
+                getReferenceClientRect: props.clientRect,
+              });
+            },
               onKeyDown: (props: any) => {
                 if (props.event.key === 'Escape') {
                   popup[0].hide();
@@ -125,7 +135,7 @@ export function CommentsTab({ card, projectId, onUpdate }: CommentsTabProps) {
         },
       }),
     ],
-  });
+  }, [projectMembers, membersLoaded]); // Recriar editor quando membros mudarem
 
   useEffect(() => {
     loadComments();
@@ -140,9 +150,12 @@ export function CommentsTab({ card, projectId, onUpdate }: CommentsTabProps) {
         .eq('project_id', projectId);
 
       if (error) throw error;
+      console.log('✅ Membros carregados:', data?.length || 0);
       setProjectMembers(data || []);
+      setMembersLoaded(true);
     } catch (error) {
       console.error('Error loading members:', error);
+      setMembersLoaded(true);
     }
   };
 

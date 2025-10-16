@@ -48,22 +48,38 @@ export function ChecklistTab({ card, onUpdate }: ChecklistTabProps) {
   const createChecklist = async () => {
     if (!newChecklistTitle.trim()) return;
 
+    // Otimista: adicionar temporário
+    const tempChecklist: Checklist = {
+      id: `temp-${Date.now()}`,
+      card_id: card.id,
+      title: newChecklistTitle,
+      order: checklists.length,
+      items: []
+    };
+    setChecklists(prev => [...prev, tempChecklist]);
+    setNewChecklistTitle('');
+
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('checklists')
         .insert({
           card_id: card.id,
           title: newChecklistTitle,
           order: checklists.length
-        });
+        })
+        .select('*, items:checklist_items(*)')
+        .single();
 
       if (error) throw error;
 
-      setNewChecklistTitle('');
-      loadChecklists();
-      onUpdate();
+      // Substituir temp por real
+      setChecklists(prev => 
+        prev.map(c => c.id === tempChecklist.id ? data : c)
+      );
     } catch (error) {
       console.error('Error creating checklist:', error);
+      // Rollback: remover temp
+      setChecklists(prev => prev.filter(c => c.id !== tempChecklist.id));
       toast({
         title: 'Erro ao criar checklist',
         variant: 'destructive'
@@ -75,27 +91,67 @@ export function ChecklistTab({ card, onUpdate }: ChecklistTabProps) {
     const title = newItemTitle[checklistId];
     if (!title?.trim()) return;
 
+    const checklist = checklists.find(c => c.id === checklistId);
+    if (!checklist) return;
+
+    // Otimista: adicionar item temporário
+    const tempItem = {
+      id: `temp-${Date.now()}`,
+      checklist_id: checklistId,
+      title,
+      order: checklist.items.length,
+      done: false,
+      done_at: null
+    };
+    
+    setChecklists(prev => prev.map(c => 
+      c.id === checklistId 
+        ? { ...c, items: [...c.items, tempItem] }
+        : c
+    ));
+    setNewItemTitle(prev => ({ ...prev, [checklistId]: '' }));
+
     try {
-      const checklist = checklists.find(c => c.id === checklistId);
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('checklist_items')
         .insert({
           checklist_id: checklistId,
           title,
-          order: checklist?.items.length || 0
-        });
+          order: checklist.items.length
+        })
+        .select('*')
+        .single();
 
       if (error) throw error;
 
-      setNewItemTitle(prev => ({ ...prev, [checklistId]: '' }));
-      loadChecklists();
-      onUpdate();
+      // Substituir temp por real
+      setChecklists(prev => prev.map(c =>
+        c.id === checklistId
+          ? { ...c, items: c.items.map(i => i.id === tempItem.id ? data : i) }
+          : c
+      ));
     } catch (error) {
       console.error('Error creating item:', error);
+      // Rollback: remover temp
+      setChecklists(prev => prev.map(c =>
+        c.id === checklistId
+          ? { ...c, items: c.items.filter(i => i.id !== tempItem.id) }
+          : c
+      ));
     }
   };
 
   const toggleItem = async (itemId: string, done: boolean) => {
+    // Otimista: atualizar localmente primeiro
+    setChecklists(prev => prev.map(c => ({
+      ...c,
+      items: c.items.map(i => 
+        i.id === itemId 
+          ? { ...i, done, done_at: done ? new Date().toISOString() : null }
+          : i
+      )
+    })));
+
     try {
       const { error } = await supabase
         .from('checklist_items')
@@ -106,15 +162,18 @@ export function ChecklistTab({ card, onUpdate }: ChecklistTabProps) {
         .eq('id', itemId);
 
       if (error) throw error;
-
-      loadChecklists();
-      onUpdate();
     } catch (error) {
       console.error('Error toggling item:', error);
+      // Rollback: recarregar do servidor
+      loadChecklists();
     }
   };
 
   const deleteChecklist = async (checklistId: string) => {
+    // Otimista: remover localmente
+    const backup = checklists.find(c => c.id === checklistId);
+    setChecklists(prev => prev.filter(c => c.id !== checklistId));
+
     try {
       const { error } = await supabase
         .from('checklists')
@@ -122,11 +181,12 @@ export function ChecklistTab({ card, onUpdate }: ChecklistTabProps) {
         .eq('id', checklistId);
 
       if (error) throw error;
-
-      loadChecklists();
-      onUpdate();
     } catch (error) {
       console.error('Error deleting checklist:', error);
+      // Rollback: restaurar
+      if (backup) {
+        setChecklists(prev => [...prev, backup]);
+      }
     }
   };
 

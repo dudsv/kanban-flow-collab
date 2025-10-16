@@ -80,6 +80,7 @@ export const useBoard = (projectId: string) => {
   }, [projectId]);
 
   const moveCard = useCallback(async (cardId: string, targetColumnId: string, optimisticUpdate: () => void) => {
+    console.log('🚀 Movendo card:', { cardId, targetColumnId });
     optimisticUpdate();
 
     try {
@@ -88,7 +89,12 @@ export const useBoard = (projectId: string) => {
         .update({ column_id: targetColumnId, updated_at: new Date().toISOString() })
         .eq('id', cardId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Erro ao mover card:', error);
+        throw error;
+      }
+
+      console.log('✅ Card movido com sucesso');
 
       // Audit log
       await supabase.from('audit_log').insert({
@@ -98,11 +104,11 @@ export const useBoard = (projectId: string) => {
         project_id: projectId,
         actor_id: (await supabase.auth.getUser()).data.user?.id
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error moving card:', error);
       toast({
         title: 'Erro ao mover card',
-        description: 'Não foi possível mover o card. Recarregando...',
+        description: error.message || 'Não foi possível mover o card. Recarregando...',
         variant: 'destructive'
       });
       loadBoard();
