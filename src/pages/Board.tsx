@@ -30,7 +30,7 @@ export default function Board() {
     loadBoard();
   }, [loadBoard]);
 
-  useBoardRealtime(projectId!, handleBoardUpdate);
+  const { trackUserUpdate } = useBoardRealtime(projectId!, handleBoardUpdate);
 
   useEffect(() => {
     if (projectId) {
@@ -103,6 +103,8 @@ export default function Board() {
       });
     };
 
+    // Track this update to prevent realtime reload
+    trackUserUpdate(cardId);
     moveCard(cardId, targetColumnId, optimisticUpdate);
   };
 

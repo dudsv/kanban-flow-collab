@@ -84,9 +84,16 @@ export const useBoard = (projectId: string) => {
     optimisticUpdate();
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
       const { error } = await supabase
         .from('cards')
-        .update({ column_id: targetColumnId, updated_at: new Date().toISOString() })
+        .update({ 
+          column_id: targetColumnId, 
+          updated_at: new Date().toISOString(),
+          updated_by: user.id
+        })
         .eq('id', cardId);
 
       if (error) {
@@ -102,7 +109,7 @@ export const useBoard = (projectId: string) => {
         entity_id: cardId,
         action: 'move',
         project_id: projectId,
-        actor_id: (await supabase.auth.getUser()).data.user?.id
+        actor_id: user.id
       });
     } catch (error: any) {
       console.error('Error moving card:', error);
