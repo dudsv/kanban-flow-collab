@@ -151,4 +151,21 @@ All colors MUST be HSL.
   .mention-item {
     @apply px-3 py-2 text-sm cursor-pointer rounded hover:bg-accent transition-colors;
   }
+
+  /* TipTap Editor Styles */
+  .ProseMirror {
+    outline: none;
+  }
+
+  .ProseMirror p.is-editor-empty:first-child::before {
+    color: hsl(var(--muted-foreground));
+    content: attr(data-placeholder);
+    float: left;
+    height: 0;
+    pointer-events: none;
+  }
+
+  .ProseMirror .mention {
+    @apply bg-primary/10 text-primary px-1 py-0.5 rounded font-medium;
+  }
 }

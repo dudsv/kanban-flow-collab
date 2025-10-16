@@ -8,6 +8,7 @@ import { FolderIcon, FileIcon, Upload, FolderPlus, Search, Trash2 } from 'lucide
 import { useDropzone } from 'react-dropzone';
 import { useFilePreview } from '@/hooks/useFilePreview';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AppLayout } from '@/components/layout/AppLayout';
 
 export default function Files() {
   const { id: projectId } = useParams<{ id: string }>();
@@ -63,37 +64,38 @@ export default function Files() {
   );
 
   return (
-    <div className="flex h-screen">
-      {/* Sidebar - Folder Tree */}
-      <div className="w-64 border-r border-border bg-muted/30 p-4 overflow-y-auto">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold">Folders</h3>
-          <Button size="sm" variant="ghost" onClick={handleCreateFolder}>
-            <FolderPlus className="h-4 w-4" />
-          </Button>
-        </div>
-        <div className="space-y-1">
-          <Button
-            variant={currentFolderId === null ? 'secondary' : 'ghost'}
-            className="w-full justify-start"
-            onClick={() => setCurrentFolderId(null)}
-          >
-            <FolderIcon className="h-4 w-4 mr-2" />
-            Root
-          </Button>
-          {folders.map(folder => (
+    <AppLayout>
+      <div className="flex h-full">
+        {/* Sidebar - Folder Tree */}
+        <div className="w-64 border-r border-border bg-muted/30 p-4 overflow-y-auto">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold">Folders</h3>
+            <Button size="sm" variant="ghost" onClick={handleCreateFolder}>
+              <FolderPlus className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="space-y-1">
             <Button
-              key={folder.id}
-              variant={currentFolderId === folder.id ? 'secondary' : 'ghost'}
-              className="w-full justify-start pl-6"
-              onClick={() => setCurrentFolderId(folder.id)}
+              variant={currentFolderId === null ? 'secondary' : 'ghost'}
+              className="w-full justify-start"
+              onClick={() => setCurrentFolderId(null)}
             >
               <FolderIcon className="h-4 w-4 mr-2" />
-              {folder.name}
+              Root
             </Button>
-          ))}
+            {folders.map(folder => (
+              <Button
+                key={folder.id}
+                variant={currentFolderId === folder.id ? 'secondary' : 'ghost'}
+                className="w-full justify-start pl-6"
+                onClick={() => setCurrentFolderId(folder.id)}
+              >
+                <FolderIcon className="h-4 w-4 mr-2" />
+                {folder.name}
+              </Button>
+            ))}
+          </div>
         </div>
-      </div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
@@ -172,7 +174,8 @@ export default function Files() {
           onClose={() => setSelectedFile(null)}
         />
       )}
-    </div>
+      </div>
+    </AppLayout>
   );
 }
 

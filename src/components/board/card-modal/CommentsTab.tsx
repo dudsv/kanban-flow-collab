@@ -188,113 +188,175 @@ export function CommentsTab({ card, projectId, onUpdate }: CommentsTabProps) {
       if (!user.user) {
         toast({
           title: 'Erro',
-          description: 'Você precisa estar autenticado',
-          variant: 'destructive'
+          description: 'Você precisa estar autenticado para comentar',
+          variant: 'destructive',
         });
         return;
       }
 
+      // ✅ Update otimista - adicionar comentário temporário
+      const tempComment = {
+        id: `temp-${Date.now()}`,
+        card_id: card.id,
+        author_id: user.user.id,
+        body: content,
+        created_at: new Date().toISOString(),
+        deleted_at: null,
+        author: {
+          name: user.user.user_metadata?.name || user.user.email || 'Você',
+          avatar_url: user.user.user_metadata?.avatar_url || null,
+        },
+      };
+      setComments((prev) => [...prev, tempComment as Comment]);
+      editor.commands.clearContent();
+
+      // Inserir no banco
       const { data: comment, error } = await supabase
         .from('comments')
         .insert({
           card_id: card.id,
           author_id: user.user.id,
-          body: content
+          body: content,
         })
-        .select('id, created_at, body, author_id')
+        .select('id, created_at, body, author_id, deleted_at, author:profiles!comments_author_id_fkey(name, avatar_url)')
         .single();
 
       if (error) {
         console.error('Comment error:', error);
+        // Rollback otimista
+        setComments((prev) => prev.filter((c) => c.id !== tempComment.id));
         throw error;
       }
 
-      const mentionedIds = Array.from(content.matchAll(/data-user-id="([^"]+)"/g)).map(m => m[1]);
+      // Substituir temp por real
+      setComments((prev) =>
+        prev.map((c) => (c.id === tempComment.id ? (comment as Comment) : c))
+      );
 
-      if (mentionedIds.length > 0) {
-        await supabase.from('comment_mentions')
-          .insert(mentionedIds.map(uid => ({ comment_id: comment.id, mentioned_user_id: uid })));
+      // Extract mentioned user IDs
+      const mentionedUserIds = Array.from(
+        content.matchAll(/data-user-id="([^"]+)"/g)
+      ).map((match) => match[1]);
 
-        await supabase.from('notifications')
-          .insert(mentionedIds.map(uid => ({
-            user_id: uid,
+      if (mentionedUserIds.length > 0 && comment) {
+        // Insert mentions
+        await supabase.from('comment_mentions').insert(
+          mentionedUserIds.map((userId) => ({
+            comment_id: comment.id,
+            mentioned_user_id: userId,
+          }))
+        );
+
+        // Create notifications
+        await supabase.from('notifications').insert(
+          mentionedUserIds.map((userId) => ({
+            user_id: userId,
             type: 'mention',
-            payload: { projectId, cardId: card.id, commentId: comment.id }
-          })));
+            payload: {
+              projectId,
+              cardId: card.id,
+              commentId: comment.id,
+            },
+          }))
+        );
       }
 
-      editor.commands.clearContent();
-      loadComments();
+      // ❌ NÃO chamar loadComments() - confiar no update otimista
 
       toast({
         title: 'Comentário adicionado',
-        description: 'Seu comentário foi publicado com sucesso.'
+        description: 'Seu comentário foi publicado com sucesso.',
       });
     } catch (error: any) {
       console.error('Error posting comment:', error);
       toast({
         title: 'Erro ao comentar',
         description: error.message || 'Tente novamente',
-        variant: 'destructive'
+        variant: 'destructive',
       });
     } finally {
       setPosting(false);
     }
   };
 
-  if (loading) {
-    return <div className="text-center py-8 text-muted-foreground">Carregando...</div>;
-  }
-
   return (
     <div className="space-y-6">
-      {/* New Comment */}
-      <div className="space-y-2">
-        <EditorContent editor={editor} />
-        <p className="text-xs text-muted-foreground">
-          Use @ para mencionar membros do projeto
-        </p>
-        <Button onClick={postComment} disabled={posting}>
-          <Send className="h-4 w-4 mr-2" />
-          {posting ? 'Enviando...' : 'Comentar'}
-        </Button>
-      </div>
+      {loading ? (
+        <div className="text-center py-8">Carregando comentários...</div>
+      ) : (
+        <>
+          {/* Editor de comentário com melhor UX */}
+          <div className="space-y-3 p-4 border border-border rounded-lg bg-muted/30">
+            <label className="text-sm font-medium">Novo comentário</label>
 
-      {/* Comments List */}
-      <div className="space-y-4">
-        {comments.map(comment => (
-          <div key={comment.id} className="flex gap-3 p-3 rounded-lg bg-muted/30">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={comment.author.avatar_url || ''} />
-              <AvatarFallback>
-                {comment.author.name.substring(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-
-            <div className="flex-1 space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-sm">{comment.author.name}</span>
-                <span className="text-xs text-muted-foreground">
-                  {formatDistanceToNow(new Date(comment.created_at), {
-                    addSuffix: true,
-                    locale: ptBR
-                  })}
-                </span>
-              </div>
-              <div 
-                className="text-sm prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: comment.body }}
+            {/* TipTap Editor */}
+            <div className="border border-input rounded-md bg-background">
+              <EditorContent
+                editor={editor}
+                className="prose prose-sm max-w-none p-3 min-h-[100px] focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 rounded-md"
               />
             </div>
-          </div>
-        ))}
 
-        {comments.length === 0 && (
-          <div className="text-center py-12 text-muted-foreground">
-            Nenhum comentário ainda. Seja o primeiro!
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                💡 Use <kbd className="px-1 py-0.5 bg-muted rounded text-xs">@</kbd> para mencionar membros
+              </p>
+              <Button onClick={postComment} disabled={posting}>
+                <Send className="h-4 w-4 mr-2" />
+                {posting ? 'Enviando...' : 'Comentar'}
+              </Button>
+            </div>
           </div>
-        )}
-      </div>
+
+          {/* Lista de comentários */}
+          <div className="space-y-3">
+            <h4 className="text-sm font-semibold text-muted-foreground">
+              Comentários ({comments.length})
+            </h4>
+
+            {comments.map((comment) => (
+              <div
+                key={comment.id}
+                className={`flex gap-3 p-4 rounded-lg border transition-smooth ${
+                  comment.id.startsWith('temp-')
+                    ? 'bg-muted/50 opacity-60 animate-pulse'
+                    : 'bg-card hover:bg-accent/5'
+                }`}
+              >
+                <Avatar className="h-9 w-9">
+                  <AvatarImage src={comment.author.avatar_url || ''} />
+                  <AvatarFallback>
+                    {comment.author.name.substring(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+
+                <div className="flex-1 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-sm">{comment.author.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {formatDistanceToNow(new Date(comment.created_at), {
+                        addSuffix: true,
+                        locale: ptBR,
+                      })}
+                    </span>
+                  </div>
+                  <div
+                    className="text-sm prose prose-sm max-w-none dark:prose-invert"
+                    dangerouslySetInnerHTML={{ __html: comment.body }}
+                  />
+                </div>
+              </div>
+            ))}
+
+            {comments.length === 0 && (
+              <div className="text-center py-12 text-muted-foreground border border-dashed rounded-lg">
+                <p className="text-sm">Nenhum comentário ainda.</p>
+                <p className="text-xs mt-1">Seja o primeiro a comentar! 💬</p>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

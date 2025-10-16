@@ -52,42 +52,69 @@ export function MembersSection({ projectId }: MembersSectionProps) {
   const handleAddMember = async () => {
     if (!searchEmail) return;
 
+    // Validar formato de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(searchEmail)) {
+      toast({
+        title: 'Email inválido',
+        description: 'Por favor, insira um email válido.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setLoading(true);
     try {
-      // Buscar usuário por email
+      // Buscar usuário por ID (temporário - idealmente buscaríamos por email)
       const { data: userData } = await supabase
         .from('profiles')
-        .select('id')
+        .select('id, name')
         .eq('id', searchEmail)
-        .single();
+        .maybeSingle();
 
-      if (!userData) {
-        toast({
-          title: 'Usuário não encontrado',
-          description: 'Verifique o email e tente novamente.',
-          variant: 'destructive',
+      if (userData) {
+        // Usuário existe - adicionar como membro diretamente
+        const { error } = await supabase.from('project_members').insert({
+          project_id: projectId,
+          user_id: userData.id,
+          role: 'member',
         });
-        return;
+
+        if (error) throw error;
+
+        toast({
+          title: 'Membro adicionado',
+          description: `${userData.name} foi adicionado ao projeto.`,
+        });
+
+        setSearchEmail('');
+        loadMembers();
+      } else {
+        // Usuário não existe - enviar convite por email
+        const { data: authUser } = await supabase.auth.getUser();
+
+        const { error } = await supabase.functions.invoke('send-invite', {
+          body: {
+            email: searchEmail,
+            projectId: projectId,
+            inviterName: authUser.user?.email || 'Um membro',
+          },
+        });
+
+        if (error) throw error;
+
+        toast({
+          title: 'Convite enviado',
+          description: `Um email de convite foi enviado para ${searchEmail}.`,
+        });
+
+        setSearchEmail('');
       }
-
-      const { error } = await supabase.from('project_members').insert({
-        project_id: projectId,
-        user_id: userData.id,
-        role: 'member',
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: 'Membro adicionado',
-        description: 'O usuário foi adicionado ao projeto.',
-      });
-      setSearchEmail('');
-      loadMembers();
     } catch (error: any) {
+      console.error('Error adding member:', error);
       toast({
-        title: 'Erro ao adicionar membro',
-        description: error.message,
+        title: 'Erro',
+        description: error.message || 'Não foi possível adicionar o membro.',
         variant: 'destructive',
       });
     } finally {
