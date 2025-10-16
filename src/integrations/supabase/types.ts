@@ -464,6 +464,7 @@ export type Database = {
       }
       files: {
         Row: {
+          card_id: string | null
           created_at: string | null
           deleted_at: string | null
           folder_id: string | null
@@ -476,6 +477,7 @@ export type Database = {
           url: string
         }
         Insert: {
+          card_id?: string | null
           created_at?: string | null
           deleted_at?: string | null
           folder_id?: string | null
@@ -488,6 +490,7 @@ export type Database = {
           url: string
         }
         Update: {
+          card_id?: string | null
           created_at?: string | null
           deleted_at?: string | null
           folder_id?: string | null
@@ -500,6 +503,13 @@ export type Database = {
           url?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "files_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "files_folder_id_fkey"
             columns: ["folder_id"]

@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Mention from '@tiptap/extension-mention';
 import { Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
@@ -22,13 +24,94 @@ interface CommentsTabProps {
 
 export function CommentsTab({ card, projectId, onUpdate }: CommentsTabProps) {
   const [comments, setComments] = useState<Comment[]>([]);
-  const [newComment, setNewComment] = useState('');
+  const [projectMembers, setProjectMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
 
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Mention.configure({
+        HTMLAttributes: {
+          class: 'mention'
+        },
+        suggestion: {
+          items: ({ query }) => {
+            return projectMembers
+              .filter(m => m.profiles.name.toLowerCase().includes(query.toLowerCase()))
+              .slice(0, 5);
+          },
+          render: () => {
+            let component: any;
+            let popup: any;
+
+            return {
+              onStart: (props: any) => {
+                component = document.createElement('div');
+                component.className = 'mention-suggestions';
+                
+                const items = props.items.map((item: any) => {
+                  const div = document.createElement('div');
+                  div.className = 'mention-item';
+                  div.textContent = item.profiles.name;
+                  div.addEventListener('click', () => props.command({ id: item.user_id, label: item.profiles.name }));
+                  return div;
+                });
+
+                items.forEach((item: any) => component.appendChild(item));
+                document.body.appendChild(component);
+                popup = component;
+              },
+              onUpdate: (props: any) => {
+                const items = props.items.map((item: any) => {
+                  const div = document.createElement('div');
+                  div.className = 'mention-item';
+                  div.textContent = item.profiles.name;
+                  div.addEventListener('click', () => props.command({ id: item.user_id, label: item.profiles.name }));
+                  return div;
+                });
+
+                if (popup) {
+                  popup.innerHTML = '';
+                  items.forEach((item: any) => popup.appendChild(item));
+                }
+              },
+              onExit: () => {
+                if (popup) {
+                  popup.remove();
+                }
+              }
+            };
+          }
+        }
+      })
+    ],
+    content: '',
+    editorProps: {
+      attributes: {
+        class: 'prose prose-sm max-w-none focus:outline-none min-h-[80px] p-3 border rounded-md'
+      }
+    }
+  });
+
   useEffect(() => {
     loadComments();
+    loadProjectMembers();
   }, [card.id]);
+
+  const loadProjectMembers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('project_members')
+        .select('user_id, profiles(name, avatar_url)')
+        .eq('project_id', projectId);
+
+      if (error) throw error;
+      setProjectMembers(data || []);
+    } catch (error) {
+      console.error('Error loading members:', error);
+    }
+  };
 
   const loadComments = async () => {
     try {
@@ -49,28 +132,54 @@ export function CommentsTab({ card, projectId, onUpdate }: CommentsTabProps) {
   };
 
   const postComment = async () => {
-    if (!newComment.trim()) return;
+    const content = editor?.getHTML() || '';
+    if (!content.trim() || content === '<p></p>') return;
 
     setPosting(true);
     try {
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) return;
 
-      const { error } = await supabase
+      // Insert comment
+      const { data: comment, error } = await supabase
         .from('comments')
         .insert({
           card_id: card.id,
           author_id: user.user.id,
-          body: newComment
-        });
+          body: content
+        })
+        .select()
+        .single();
 
       if (error) throw error;
 
-      // TODO: Detectar @menções e criar notificações
-      // const mentions = newComment.match(/@(\w+)/g);
-      // if (mentions) {
-      //   // Buscar usuários mencionados e criar notificações
-      // }
+      // Extract mentions from content
+      const mentionRegex = /@\[([^\]]+)\]\(([^)]+)\)/g;
+      const mentions = [...content.matchAll(mentionRegex)];
+      
+      if (mentions.length > 0) {
+        // Insert mentions
+        const mentionInserts = mentions.map(match => ({
+          comment_id: comment.id,
+          mentioned_user_id: match[2]
+        }));
+
+        await supabase.from('comment_mentions').insert(mentionInserts);
+
+        // Create notifications
+        const notificationInserts = mentions.map(match => ({
+          user_id: match[2],
+          type: 'mention_comment',
+          payload: {
+            comment_id: comment.id,
+            card_id: card.id,
+            card_title: card.title,
+            author_name: user.user.email
+          }
+        }));
+
+        await supabase.from('notifications').insert(notificationInserts);
+      }
 
       // Audit log
       await supabase.from('audit_log').insert({
@@ -80,7 +189,7 @@ export function CommentsTab({ card, projectId, onUpdate }: CommentsTabProps) {
         actor_id: user.user.id
       });
 
-      setNewComment('');
+      editor?.commands.clearContent();
       loadComments();
       onUpdate();
 
@@ -108,13 +217,11 @@ export function CommentsTab({ card, projectId, onUpdate }: CommentsTabProps) {
     <div className="space-y-6">
       {/* New Comment */}
       <div className="space-y-2">
-        <Textarea
-          placeholder="Escreva um comentário... (use @ para mencionar)"
-          value={newComment}
-          onChange={(e) => setNewComment(e.target.value)}
-          rows={3}
-        />
-        <Button onClick={postComment} disabled={posting || !newComment.trim()}>
+        <EditorContent editor={editor} />
+        <p className="text-xs text-muted-foreground">
+          Use @ para mencionar membros do projeto
+        </p>
+        <Button onClick={postComment} disabled={posting}>
           <Send className="h-4 w-4 mr-2" />
           {posting ? 'Enviando...' : 'Comentar'}
         </Button>
@@ -141,7 +248,10 @@ export function CommentsTab({ card, projectId, onUpdate }: CommentsTabProps) {
                   })}
                 </span>
               </div>
-              <p className="text-sm whitespace-pre-wrap">{comment.body}</p>
+              <div 
+                className="text-sm prose prose-sm max-w-none"
+                dangerouslySetInnerHTML={{ __html: comment.body }}
+              />
             </div>
           </div>
         ))}

@@ -16,6 +16,7 @@ export default function Board() {
   
   const [activeCard, setActiveCard] = useState<BoardCard | null>(null);
   const [selectedCard, setSelectedCard] = useState<BoardCard | null>(null);
+  const [createCardColumnId, setCreateCardColumnId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
@@ -177,7 +178,7 @@ export default function Board() {
                   key={column.id}
                   column={column}
                   onCardClick={setSelectedCard}
-                  onCreateCard={(title) => createCard(column.id, title)}
+                  onCreateCard={() => setCreateCardColumnId(column.id)}
                 />
               ))}
             </div>
@@ -199,6 +200,34 @@ export default function Board() {
             tags={tags}
             onClose={() => setSelectedCard(null)}
             onUpdate={loadBoard}
+          />
+        )}
+
+        {createCardColumnId && (
+          <CardModal
+            card={{
+              id: '',
+              title: 'Novo Card',
+              description: '',
+              column_id: createCardColumnId,
+              project_id: projectId!,
+              created_by: '',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              deleted_at: null,
+              priority: 'medium',
+              due_at: null,
+              points: null,
+              swimlane: null
+            } as BoardCard}
+            projectId={projectId!}
+            tags={tags}
+            onClose={() => setCreateCardColumnId(null)}
+            onUpdate={() => {
+              loadBoard();
+              setCreateCardColumnId(null);
+            }}
+            isCreating
           />
         )}
       </div>

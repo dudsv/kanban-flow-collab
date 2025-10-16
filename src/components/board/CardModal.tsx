@@ -6,52 +6,67 @@ import {
   DialogTitle
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Info, CheckSquare, MessageSquare, History } from 'lucide-react';
+import { Info, CheckSquare, MessageSquare, History, Paperclip } from 'lucide-react';
 import { DetailsTab } from './card-modal/DetailsTab';
 import { ChecklistTab } from './card-modal/ChecklistTab';
 import { CommentsTab } from './card-modal/CommentsTab';
 import { HistoryTab } from './card-modal/HistoryTab';
+import { AttachmentsTab } from './card-modal/AttachmentsTab';
 import type { BoardCard } from '@/hooks/useBoard';
 import type { Database } from '@/integrations/supabase/types';
 
 type Tag = Database['public']['Tables']['tags']['Row'];
 
 interface CardModalProps {
-  card: BoardCard;
+  card: BoardCard | null;
   projectId: string;
   tags: Tag[];
   onClose: () => void;
   onUpdate: () => void;
+  onSave?: (card: Partial<BoardCard>) => void;
+  isCreating?: boolean;
 }
 
-export function CardModal({ card, projectId, tags, onClose, onUpdate }: CardModalProps) {
+export function CardModal({ card, projectId, tags, onClose, onUpdate, onSave, isCreating }: CardModalProps) {
   const [activeTab, setActiveTab] = useState('details');
+
+  if (!card) return null;
 
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle className="text-xl">{card.title}</DialogTitle>
+          <DialogTitle className="text-xl">
+            {isCreating ? 'Criar Novo Card' : card.title}
+          </DialogTitle>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className={isCreating ? 'grid w-full grid-cols-1' : 'grid w-full grid-cols-5'}>
             <TabsTrigger value="details" className="flex items-center gap-2">
               <Info className="h-4 w-4" />
               Detalhes
             </TabsTrigger>
-            <TabsTrigger value="checklist" className="flex items-center gap-2">
-              <CheckSquare className="h-4 w-4" />
-              Checklist
-            </TabsTrigger>
-            <TabsTrigger value="comments" className="flex items-center gap-2">
-              <MessageSquare className="h-4 w-4" />
-              Comentários
-            </TabsTrigger>
-            <TabsTrigger value="history" className="flex items-center gap-2">
-              <History className="h-4 w-4" />
-              Histórico
-            </TabsTrigger>
+            {!isCreating && (
+              <>
+                <TabsTrigger value="checklist" className="flex items-center gap-2">
+                  <CheckSquare className="h-4 w-4" />
+                  Checklist
+                </TabsTrigger>
+                <TabsTrigger value="attachments" className="flex items-center gap-2">
+                  <Paperclip className="h-4 w-4" />
+                  Anexos
+                </TabsTrigger>
+                <TabsTrigger value="comments" className="flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4" />
+                  Comentários
+                </TabsTrigger>
+                <TabsTrigger value="history" className="flex items-center gap-2">
+                  <History className="h-4 w-4" />
+                  Histórico
+                </TabsTrigger>
+              </>
+            )}
           </TabsList>
 
           <div className="flex-1 overflow-y-auto mt-4">
@@ -59,17 +74,25 @@ export function CardModal({ card, projectId, tags, onClose, onUpdate }: CardModa
               <DetailsTab card={card} projectId={projectId} tags={tags} onUpdate={onUpdate} />
             </TabsContent>
 
-            <TabsContent value="checklist" className="mt-0">
-              <ChecklistTab card={card} onUpdate={onUpdate} />
-            </TabsContent>
+            {!isCreating && (
+              <>
+                <TabsContent value="checklist" className="mt-0">
+                  <ChecklistTab card={card} onUpdate={onUpdate} />
+                </TabsContent>
 
-            <TabsContent value="comments" className="mt-0">
-              <CommentsTab card={card} projectId={projectId} onUpdate={onUpdate} />
-            </TabsContent>
+                <TabsContent value="attachments" className="mt-0">
+                  <AttachmentsTab card={card} projectId={projectId} onUpdate={onUpdate} />
+                </TabsContent>
 
-            <TabsContent value="history" className="mt-0">
-              <HistoryTab cardId={card.id} />
-            </TabsContent>
+                <TabsContent value="comments" className="mt-0">
+                  <CommentsTab card={card} projectId={projectId} onUpdate={onUpdate} />
+                </TabsContent>
+
+                <TabsContent value="history" className="mt-0">
+                  <HistoryTab cardId={card.id} />
+                </TabsContent>
+              </>
+            )}
           </div>
         </Tabs>
       </DialogContent>

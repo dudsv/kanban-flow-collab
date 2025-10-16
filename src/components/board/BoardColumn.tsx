@@ -10,7 +10,7 @@ import type { BoardColumn as BoardColumnType, BoardCard } from '@/hooks/useBoard
 interface BoardColumnProps {
   column: BoardColumnType;
   onCardClick: (card: BoardCard) => void;
-  onCreateCard: (title: string) => void;
+  onCreateCard: () => void;
 }
 
 export function BoardColumn({ column, onCardClick, onCreateCard }: BoardColumnProps) {
@@ -24,11 +24,7 @@ export function BoardColumn({ column, onCardClick, onCreateCard }: BoardColumnPr
   const isWipLimitReached = column.wip_limit && column.cards.length >= column.wip_limit;
 
   const handleCreateCard = () => {
-    if (newCardTitle.trim()) {
-      onCreateCard(newCardTitle.trim());
-      setNewCardTitle('');
-      setIsAddingCard(false);
-    }
+    onCreateCard();
   };
 
   return (
@@ -75,48 +71,15 @@ export function BoardColumn({ column, onCardClick, onCreateCard }: BoardColumnPr
 
       {/* Add Card */}
       <div className="mt-2">
-        {isAddingCard ? (
-          <div className="space-y-2">
-            <Input
-              placeholder="Título do card..."
-              value={newCardTitle}
-              onChange={(e) => setNewCardTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleCreateCard();
-                if (e.key === 'Escape') {
-                  setIsAddingCard(false);
-                  setNewCardTitle('');
-                }
-              }}
-              autoFocus
-            />
-            <div className="flex gap-2">
-              <Button size="sm" onClick={handleCreateCard}>
-                Adicionar
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  setIsAddingCard(false);
-                  setNewCardTitle('');
-                }}
-              >
-                Cancelar
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start"
-            onClick={() => setIsAddingCard(true)}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Adicionar card
-          </Button>
-        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start"
+          onClick={handleCreateCard}
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Adicionar card
+        </Button>
       </div>
     </div>
   );

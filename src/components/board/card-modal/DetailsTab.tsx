@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import {
   Select,
   SelectContent,
@@ -16,6 +17,7 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
+import { TagManager } from './TagManager';
 import type { BoardCard } from '@/hooks/useBoard';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -43,6 +45,7 @@ export function DetailsTab({ card, projectId, tags, onUpdate }: DetailsTabProps)
   const [priority, setPriority] = useState<Priority | undefined>(card.priority || undefined);
   const [dueDate, setDueDate] = useState(card.due_at || '');
   const [points, setPoints] = useState(card.points?.toString() || '');
+  const [projectMembers, setProjectMembers] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
 
   const editor = useEditor({
@@ -59,6 +62,24 @@ export function DetailsTab({ card, projectId, tags, onUpdate }: DetailsTabProps)
       }
     }
   });
+
+  useEffect(() => {
+    loadProjectMembers();
+  }, [projectId]);
+
+  const loadProjectMembers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('project_members')
+        .select('user_id, profiles(name, avatar_url)')
+        .eq('project_id', projectId);
+
+      if (error) throw error;
+      setProjectMembers(data || []);
+    } catch (error) {
+      console.error('Error loading members:', error);
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -174,7 +195,10 @@ export function DetailsTab({ card, projectId, tags, onUpdate }: DetailsTabProps)
 
       {/* Tags */}
       <div className="space-y-2">
-        <Label>Tags</Label>
+        <div className="flex items-center justify-between">
+          <Label>Tags</Label>
+          <TagManager projectId={projectId} onTagsChange={onUpdate} />
+        </div>
         <div className="flex flex-wrap gap-2">
           {tags.map(tag => {
             const isSelected = card.tags?.some(t => t.tag_id === tag.id);
@@ -210,6 +234,11 @@ export function DetailsTab({ card, projectId, tags, onUpdate }: DetailsTabProps)
               </Badge>
             );
           })}
+          {tags.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              Use o botão "Gerenciar Tags" para criar tags
+            </p>
+          )}
         </div>
       </div>
 
@@ -219,17 +248,55 @@ export function DetailsTab({ card, projectId, tags, onUpdate }: DetailsTabProps)
           <Users className="h-4 w-4" />
           Atribuídos
         </Label>
-        <div className="text-sm text-muted-foreground">
-          {card.assignees && card.assignees.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {card.assignees.map(({ profiles }) => (
-                <Badge key={profiles.name} variant="secondary">
-                  {profiles.name}
-                </Badge>
-              ))}
+        <div className="space-y-2">
+          {projectMembers.length > 0 ? (
+            <div className="space-y-1">
+              {projectMembers.map(member => {
+                const isAssigned = card.assignees?.some(a => a.user_id === member.user_id);
+                return (
+                  <div
+                    key={member.user_id}
+                    className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                    onClick={async () => {
+                      try {
+                        if (isAssigned) {
+                          await supabase
+                            .from('card_assignees')
+                            .delete()
+                            .eq('card_id', card.id)
+                            .eq('user_id', member.user_id);
+                        } else {
+                          await supabase
+                            .from('card_assignees')
+                            .insert({ card_id: card.id, user_id: member.user_id });
+                        }
+                        onUpdate();
+                      } catch (error) {
+                        console.error('Error toggling assignee:', error);
+                      }
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isAssigned}
+                      readOnly
+                      className="rounded"
+                    />
+                    <Avatar className="h-6 w-6">
+                      <AvatarImage src={member.profiles.avatar_url || ''} />
+                      <AvatarFallback className="text-xs">
+                        {member.profiles.name.substring(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-sm">{member.profiles.name}</span>
+                  </div>
+                );
+              })}
             </div>
           ) : (
-            'Nenhum usuário atribuído'
+            <p className="text-sm text-muted-foreground">
+              Nenhum membro no projeto
+            </p>
           )}
         </div>
       </div>

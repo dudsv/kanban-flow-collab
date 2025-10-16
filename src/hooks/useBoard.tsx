@@ -109,19 +109,30 @@ export const useBoard = (projectId: string) => {
     }
   }, [projectId, loadBoard]);
 
-  const createCard = useCallback(async (columnId: string, title: string) => {
+  const createCard = useCallback(async (columnId: string, cardData: Partial<Card> | string) => {
     try {
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) return;
 
+      // Handle legacy string parameter for backwards compatibility
+      const insertData: any = typeof cardData === 'string' 
+        ? {
+            project_id: projectId,
+            column_id: columnId,
+            created_by: user.user.id,
+            title: cardData
+          }
+        : {
+            project_id: projectId,
+            column_id: columnId,
+            created_by: user.user.id,
+            title: cardData.title || 'Novo Card',
+            ...cardData
+          };
+
       const { data, error } = await supabase
         .from('cards')
-        .insert({
-          project_id: projectId,
-          column_id: columnId,
-          title,
-          created_by: user.user.id
-        })
+        .insert(insertData)
         .select()
         .single();
 
