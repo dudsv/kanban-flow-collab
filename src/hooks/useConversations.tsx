@@ -17,22 +17,26 @@ export interface ConversationMember {
   user_id: string;
 }
 
-export function useConversations() {
+export function useConversations(projectId?: string, cardId?: string) {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
   const loadConversations = useCallback(async () => {
-    const { data, error } = await supabase
+    let query = supabase
       .from('conversations')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .select('*');
+
+    if (projectId) query = query.eq('project_id', projectId);
+    if (cardId) query = query.eq('card_id', cardId);
+
+    const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
       toast({ title: 'Error loading conversations', description: error.message, variant: 'destructive' });
       return [];
     }
     return data as Conversation[];
-  }, [toast]);
+  }, [toast, projectId, cardId]);
 
   const createConversation = useCallback(async (
     type: 'dm' | 'group' | 'project' | 'card',

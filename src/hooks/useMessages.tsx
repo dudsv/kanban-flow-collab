@@ -29,7 +29,13 @@ export function useMessages(conversationId: string) {
   const loadMessages = useCallback(async (limit = 50, before?: string) => {
     let query = supabase
       .from('messages')
-      .select('*, profiles(*)')
+      .select(`
+        *,
+        author:profiles!messages_author_id_fkey(name, avatar_url, email),
+        files(*),
+        message_reactions(*),
+        message_reads(*)
+      `)
       .eq('conversation_id', conversationId)
       .is('deleted_at', null)
       .order('created_at', { ascending: false })
@@ -45,16 +51,17 @@ export function useMessages(conversationId: string) {
       toast({ title: 'Error loading messages', description: error.message, variant: 'destructive' });
       return [];
     }
-    return data as Message[];
+    return data as any[];
   }, [conversationId, toast]);
 
-  const sendMessage = useCallback(async (body: string, replyTo?: string) => {
+  const sendMessage = useCallback(async (body: string, file?: File, replyTo?: string) => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { data, error } = await supabase
+      // 1) Insert message
+      const { data: msg, error: msgError } = await supabase
         .from('messages')
         .insert([{
           conversation_id: conversationId,
@@ -62,11 +69,60 @@ export function useMessages(conversationId: string) {
           body,
           reply_to: replyTo
         }])
-        .select()
+        .select('*, author:profiles!messages_author_id_fkey(name, avatar_url, email)')
         .single();
 
-      if (error) throw error;
-      return data as Message;
+      if (msgError) throw msgError;
+
+      // 2) Upload file if provided
+      if (file) {
+        // Get project_id from conversation
+        const { data: conv } = await supabase
+          .from('conversations')
+          .select('project_id, card_id')
+          .eq('id', conversationId)
+          .single();
+
+        let projectId = conv?.project_id;
+
+        // If card conversation, get project_id from card
+        if (!projectId && conv?.card_id) {
+          const { data: card } = await supabase
+            .from('cards')
+            .select('project_id')
+            .eq('id', conv.card_id)
+            .single();
+          projectId = card?.project_id;
+        }
+
+        if (!projectId) throw new Error('Cannot determine project_id for file upload');
+
+        // Upload to storage: {projectId}/chat/{conversationId}/{uuid}-{filename}
+        const filePath = `${projectId}/chat/${conversationId}/${crypto.randomUUID()}-${file.name}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('project-files')
+          .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        // Save to files table
+        const { error: fileInsertError } = await supabase
+          .from('files')
+          .insert({
+            project_id: projectId,
+            message_id: msg.id,
+            name: file.name,
+            url: filePath,
+            mime_type: file.type,
+            size_bytes: file.size,
+            uploaded_by: user.id
+          });
+
+        if (fileInsertError) throw fileInsertError;
+      }
+
+      return msg as any;
     } catch (error: any) {
       toast({ title: 'Send failed', description: error.message, variant: 'destructive' });
       return null;
@@ -75,33 +131,44 @@ export function useMessages(conversationId: string) {
     }
   }, [conversationId, toast]);
 
-  const addReaction = useCallback(async (messageId: string, emoji: string) => {
+  const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return false;
 
-    const { error } = await supabase
+    // Check if reaction exists
+    const { data: existing } = await supabase
       .from('message_reactions')
-      .insert([{ message_id: messageId, user_id: user.id, emoji }]);
+      .select('id')
+      .eq('message_id', messageId)
+      .eq('user_id', user.id)
+      .eq('emoji', emoji)
+      .maybeSingle();
 
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      return false;
+    if (existing) {
+      // Remove reaction
+      const { error } = await supabase
+        .from('message_reactions')
+        .delete()
+        .eq('id', existing.id);
+
+      if (error) {
+        toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        return false;
+      }
+    } else {
+      // Add reaction
+      const { error } = await supabase
+        .from('message_reactions')
+        .insert([{ message_id: messageId, user_id: user.id, emoji }]);
+
+      if (error) {
+        toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        return false;
+      }
     }
     return true;
   }, [toast]);
 
-  const removeReaction = useCallback(async (reactionId: string) => {
-    const { error } = await supabase
-      .from('message_reactions')
-      .delete()
-      .eq('id', reactionId);
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      return false;
-    }
-    return true;
-  }, [toast]);
 
   const markAsRead = useCallback(async (messageId: string) => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -116,26 +183,12 @@ export function useMessages(conversationId: string) {
     }
   }, []);
 
-  const loadReactions = useCallback(async (messageId: string) => {
-    const { data, error } = await supabase
-      .from('message_reactions')
-      .select('*')
-      .eq('message_id', messageId);
-
-    if (error) {
-      console.error('Load reactions error:', error);
-      return [];
-    }
-    return data as MessageReaction[];
-  }, []);
 
   return {
     loading,
     loadMessages,
     sendMessage,
-    addReaction,
-    removeReaction,
-    markAsRead,
-    loadReactions
+    toggleReaction,
+    markAsRead
   };
 }

@@ -53,11 +53,16 @@ export function useChatPresence(conversationId: string) {
   }, [conversationId]);
 
   const setTyping = async (typing: boolean) => {
+    if (!conversationId) return;
+    
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const channel = supabase.channel(`typing-${conversationId}`);
-    await channel.track({ userId: user.id, typing });
+    const channels = supabase.getChannels();
+    const channel = channels.find(ch => ch.topic === `typing-${conversationId}`);
+    if (channel) {
+      await channel.track({ userId: user.id, typing });
+    }
   };
 
   return {
