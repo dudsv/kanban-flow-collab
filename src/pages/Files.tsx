@@ -2,14 +2,27 @@ import { useState, useCallback, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useFiles, type Folder, type FileItem } from '@/hooks/useFiles';
 import { useFilesRealtime } from '@/hooks/useFilesRealtime';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { FolderIcon, FileIcon, Upload, FolderPlus, Search, Trash2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { 
+  FolderIcon, 
+  FileIcon, 
+  Upload, 
+  FolderPlus, 
+  Search, 
+  Trash2, 
+  Eye,
+  FileText,
+  CreditCard,
+  Home,
+  ChevronRight
+} from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import { useFilePreview } from '@/hooks/useFilePreview';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
-import { AppLayout } from '@/components/layout/AppLayout';
 
 export default function Files() {
   const { id: projectId } = useParams<{ id: string }>();
@@ -65,50 +78,55 @@ export default function Files() {
     file.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const docFiles = filteredFiles.filter(f => !f.card_id);
+  const cardFiles = filteredFiles.filter(f => f.card_id);
+
   const pathSegments = currentPath.split('/').filter(Boolean);
 
   return (
     <AppLayout>
       <div className="flex h-full">
         {/* Sidebar - Folder Tree */}
-        <div className="w-64 border-r border-border bg-muted/30 p-4 overflow-y-auto">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold">Pastas</h3>
-            <Button size="sm" variant="ghost" onClick={handleCreateFolder}>
-              <FolderPlus className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="space-y-1">
-            <Button
-              variant={currentFolderId === null ? 'secondary' : 'ghost'}
-              className="w-full justify-start"
-              onClick={() => {
-                setCurrentFolderId(null);
-                setCurrentPath('');
-              }}
-            >
-              <FolderIcon className="h-4 w-4 mr-2" />
-              Raiz
-            </Button>
-            {folders.map(folder => (
+        <div className="w-64 border-r border-border bg-muted/30 overflow-y-auto">
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold">Pastas</h3>
+              <Button size="sm" variant="ghost" onClick={handleCreateFolder}>
+                <FolderPlus className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="space-y-1">
               <Button
-                key={folder.id}
-                variant={currentFolderId === folder.id ? 'secondary' : 'ghost'}
-                className="w-full justify-start pl-6"
+                variant={currentFolderId === null ? 'secondary' : 'ghost'}
+                className="w-full justify-start"
                 onClick={() => {
-                  setCurrentFolderId(folder.id);
-                  setCurrentPath(folder.name);
+                  setCurrentFolderId(null);
+                  setCurrentPath('');
                 }}
               >
                 <FolderIcon className="h-4 w-4 mr-2" />
-                {folder.name}
+                Raiz
               </Button>
-            ))}
+              {folders.map(folder => (
+                <Button
+                  key={folder.id}
+                  variant={currentFolderId === folder.id ? 'secondary' : 'ghost'}
+                  className="w-full justify-start pl-6"
+                  onClick={() => {
+                    setCurrentFolderId(folder.id);
+                    setCurrentPath(folder.name);
+                  }}
+                >
+                  <FolderIcon className="h-4 w-4 mr-2" />
+                  {folder.name}
+                </Button>
+              ))}
+            </div>
           </div>
         </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-h-0">
         {/* Breadcrumbs */}
         <div className="border-b border-border p-4">
           <Breadcrumb>
@@ -119,33 +137,29 @@ export default function Files() {
                     setCurrentPath('');
                     setCurrentFolderId(null);
                   }} 
-                  className="cursor-pointer hover:text-foreground"
+                  className="cursor-pointer hover:text-foreground flex items-center gap-1"
                 >
-                  📁 Documentos
+                  <Home className="h-4 w-4" />
+                  Raiz
                 </BreadcrumbLink>
               </BreadcrumbItem>
               {pathSegments.map((segment, index) => (
-                <BreadcrumbItem key={index}>
-                  <BreadcrumbSeparator />
-                  <BreadcrumbLink 
-                    onClick={() => setCurrentPath(pathSegments.slice(0, index + 1).join('/'))}
-                    className="cursor-pointer hover:text-foreground"
-                  >
-                    {segment.startsWith('cards/') ? '📌 Cards' : segment}
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
+                <>
+                  <BreadcrumbSeparator key={`sep-${index}`}>
+                    <ChevronRight className="h-4 w-4" />
+                  </BreadcrumbSeparator>
+                  <BreadcrumbItem key={index}>
+                    <BreadcrumbLink 
+                      onClick={() => setCurrentPath(pathSegments.slice(0, index + 1).join('/'))}
+                      className="cursor-pointer hover:text-foreground"
+                    >
+                      {segment}
+                    </BreadcrumbLink>
+                  </BreadcrumbItem>
+                </>
               ))}
             </BreadcrumbList>
           </Breadcrumb>
-
-          {/* Cards notice */}
-          {currentPath.startsWith('cards/') && (
-            <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3 mt-4">
-              <p className="text-sm text-amber-800 dark:text-amber-200">
-                📌 Arquivos anexados a cards
-              </p>
-            </div>
-          )}
         </div>
 
         {/* Toolbar */}
@@ -163,55 +177,147 @@ export default function Files() {
             <FolderPlus className="h-4 w-4 mr-2" />
             Nova Pasta
           </Button>
-          <Button {...getRootProps()}>
-            <Upload className="h-4 w-4 mr-2" />
-            Upload
-            <input {...getInputProps()} />
-          </Button>
         </div>
 
-        {/* Files Grid */}
-        <div
-          {...getRootProps()}
-          className={`flex-1 p-6 overflow-y-auto ${
-            isDragActive ? 'bg-primary/10 border-2 border-dashed border-primary' : ''
-          }`}
-        >
-          <input {...getInputProps()} />
-          {filteredFiles.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-muted-foreground">
-              {isDragActive ? 'Solte os arquivos aqui...' : 'Nenhum arquivo. Arraste e solte ou clique em Upload.'}
+        {/* Tabs: Docs vs Cards */}
+        <div className="flex-1 overflow-auto">
+          <Tabs defaultValue="docs" className="h-full flex flex-col">
+            <div className="border-b px-6 pt-4">
+              <TabsList>
+                <TabsTrigger value="docs">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Documentos ({docFiles.length})
+                </TabsTrigger>
+                <TabsTrigger value="cards">
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  Cards ({cardFiles.length})
+                </TabsTrigger>
+              </TabsList>
             </div>
-          ) : (
-            <div className="grid grid-cols-4 gap-4">
-              {filteredFiles.map(file => (
-                <div
-                  key={file.id}
-                  className="border border-border rounded-lg p-4 hover:bg-muted/50 cursor-pointer group"
-                  onClick={() => setSelectedFile(file)}
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <FileIcon className="h-8 w-8 text-primary" />
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="opacity-0 group-hover:opacity-100"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteFile(file.id);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+
+            <TabsContent value="docs" className="flex-1 p-6 mt-0">
+              {/* Drop Zone for Docs */}
+              <div
+                {...getRootProps()}
+                className={`border-2 border-dashed rounded-lg p-8 text-center mb-6 transition-colors ${
+                  isDragActive
+                    ? 'border-primary bg-primary/5'
+                    : 'border-muted-foreground/25 hover:border-primary'
+                }`}
+              >
+                <input {...getInputProps()} />
+                <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  {isDragActive
+                    ? 'Solte os arquivos aqui...'
+                    : 'Arraste arquivos ou clique para fazer upload'}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {docFiles.map(file => (
+                  <div
+                    key={file.id}
+                    className="border border-border rounded-lg p-4 hover:bg-muted/50 cursor-pointer group"
+                    onClick={() => setSelectedFile(file)}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <FileIcon className="h-8 w-8 text-primary" />
+                      <div className="opacity-0 group-hover:opacity-100 flex gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedFile(file);
+                          }}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteFile(file.id);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <p className="text-sm font-medium truncate">{file.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {file.size_bytes ? `${Math.round(file.size_bytes / 1024)} KB` : ''}
+                    </p>
                   </div>
-                  <p className="text-sm font-medium truncate">{file.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {file.size_bytes ? `${Math.round(file.size_bytes / 1024)} KB` : 'Tamanho desconhecido'}
-                  </p>
+                ))}
+              </div>
+              {docFiles.length === 0 && (
+                <div className="text-center py-12 text-muted-foreground">
+                  Nenhum documento encontrado
                 </div>
-              ))}
-            </div>
-          )}
+              )}
+            </TabsContent>
+
+            <TabsContent value="cards" className="flex-1 p-6 mt-0">
+              <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-6">
+                <p className="text-sm text-amber-800 dark:text-amber-200 flex items-center gap-2">
+                  <CreditCard className="h-4 w-4" />
+                  Arquivos anexados diretamente aos cards
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {cardFiles.map(file => (
+                  <div
+                    key={file.id}
+                    className="border border-border rounded-lg p-4 hover:bg-muted/50 cursor-pointer group"
+                    onClick={() => setSelectedFile(file)}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <FileIcon className="h-8 w-8 text-primary" />
+                      <div className="opacity-0 group-hover:opacity-100 flex gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedFile(file);
+                          }}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteFile(file.id);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <p className="text-sm font-medium truncate">{file.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {file.size_bytes ? `${Math.round(file.size_bytes / 1024)} KB` : ''}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              {cardFiles.length === 0 && (
+                <div className="text-center py-12 text-muted-foreground">
+                  Nenhum arquivo de card encontrado
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
 

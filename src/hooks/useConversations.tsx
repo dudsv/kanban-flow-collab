@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -97,6 +97,21 @@ export function useConversations(projectId?: string, cardId?: string) {
     }
     return data;
   }, [toast]);
+
+  // Realtime subscriptions
+  useEffect(() => {
+    const channel = supabase.channel('conversations-list')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'conversations' 
+      }, () => {
+        // Trigger reload in parent component
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   return {
     loading,

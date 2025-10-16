@@ -44,7 +44,6 @@ interface DetailsTabProps {
   projectId: string;
   columnId?: string;
   tags: Tag[];
-  onUpdate?: () => void;
   onCreated?: () => void;
   onClose?: () => void;
 }
@@ -58,7 +57,7 @@ const priorityLabels: Record<Priority, string> = {
   critical: 'Crítica'
 };
 
-export function DetailsTab({ mode, card, projectId, columnId, tags, onUpdate, onCreated, onClose }: DetailsTabProps) {
+export function DetailsTab({ mode, card, projectId, columnId, tags, onCreated, onClose }: DetailsTabProps) {
   const [title, setTitle] = useState(mode === 'edit' ? card?.title || '' : '');
   const [priority, setPriority] = useState<Priority | undefined>(mode === 'edit' ? card?.priority || undefined : 'medium');
   const [dueDate, setDueDate] = useState(mode === 'edit' ? card?.due_at || '' : '');
@@ -403,7 +402,7 @@ export function DetailsTab({ mode, card, projectId, columnId, tags, onUpdate, on
                     })}
                   </CommandGroup>
                   <div className="p-2 border-t">
-                    <TagManager projectId={projectId} onTagsChange={onUpdate} />
+                    <TagManager projectId={projectId} />
                   </div>
                 </CommandList>
               </Command>

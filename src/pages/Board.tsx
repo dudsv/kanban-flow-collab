@@ -22,6 +22,10 @@ export default function Board() {
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   const [selectedPriorities, setSelectedPriorities] = useState<string[]>([]);
 
+  const handleAddCard = useCallback((columnId: string) => {
+    setCreateContext({ columnId });
+  }, []);
+
   const handleBoardUpdate = useCallback(() => {
     loadBoard();
   }, [loadBoard]);
@@ -169,7 +173,7 @@ export default function Board() {
           selectedAssignees={selectedAssignees}
           onAssigneesChange={setSelectedAssignees}
           columns={columns}
-          onAddCard={(columnId) => setCreateContext({ columnId })}
+          onAddCard={handleAddCard}
         />
 
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>

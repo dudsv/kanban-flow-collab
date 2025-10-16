@@ -20,7 +20,7 @@ type Tag = Database['public']['Tables']['tags']['Row'];
 
 interface TagManagerProps {
   projectId: string;
-  onTagsChange: () => void;
+  onTagsChange?: () => void;
 }
 
 const DEFAULT_COLORS = [
@@ -118,7 +118,7 @@ export function TagManager({ projectId, onTagsChange }: TagManagerProps) {
       setColor('#8b5cf6');
       setEditingTag(null);
       loadTags();
-      onTagsChange();
+      onTagsChange?.();
     } catch (error) {
       console.error('Error saving tag:', error);
       toast({
@@ -150,7 +150,7 @@ export function TagManager({ projectId, onTagsChange }: TagManagerProps) {
       });
 
       loadTags();
-      onTagsChange();
+      onTagsChange?.();
     } catch (error) {
       console.error('Error deleting tag:', error);
       toast({

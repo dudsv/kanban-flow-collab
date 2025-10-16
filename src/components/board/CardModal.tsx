@@ -76,7 +76,6 @@ export function CardModal({ mode, card, projectId, columnId, tags, onClose, onUp
                 projectId={projectId}
                 columnId={columnId}
                 tags={tags}
-                onUpdate={onUpdate}
                 onCreated={onCreated}
                 onClose={onClose}
               />

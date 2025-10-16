@@ -9,11 +9,10 @@ const corsHeaders = {
 interface InviteRequest {
   email: string;
   projectId: string;
-  inviterName: string;
+  inviterName?: string;
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -21,12 +20,8 @@ serve(async (req) => {
   try {
     const { email, projectId, inviterName }: InviteRequest = await req.json();
 
-    console.log(`📧 Processing invite for ${email} to project ${projectId}`);
-
-    // Validar email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      throw new Error("Email inválido");
+    if (!email || !email.includes('@')) {
+      throw new Error('Invalid email address');
     }
 
     const supabase = createClient(
@@ -34,7 +29,6 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Verificar se o projeto existe
     const { data: project, error: projectError } = await supabase
       .from("projects")
       .select("id, name")
@@ -42,72 +36,40 @@ serve(async (req) => {
       .single();
 
     if (projectError || !project) {
-      throw new Error("Projeto não encontrado");
+      throw new Error('Project not found');
     }
 
-    // Criar token de convite único
-    const inviteToken = crypto.randomUUID();
+    const token = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-    // Salvar convite pendente (expira em 7 dias)
-    const { error: inviteError } = await supabase.from("project_invites").insert({
-      email,
-      project_id: projectId,
-      token: inviteToken,
-      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    });
+    const { error: inviteError } = await supabase
+      .from("project_invites")
+      .insert({
+        email,
+        project_id: projectId,
+        token,
+        expires_at: expiresAt.toISOString(),
+        invited_by: null
+      });
 
-    if (inviteError) {
-      console.error("Error creating invite:", inviteError);
-      throw new Error("Erro ao criar convite");
-    }
+    if (inviteError) throw inviteError;
 
-    // Criar URL de convite
     const appUrl = Deno.env.get("APP_URL") || "http://localhost:5173";
-    const inviteUrl = `${appUrl}/register?invite=${inviteToken}`;
+    const inviteUrl = `${appUrl}/register?invite=${token}`;
 
-    console.log(`✅ Invite created: ${inviteUrl}`);
-
-    // TODO: Integração com Resend para envio de email
-    // Descomentar quando configurar RESEND_API_KEY
-    /*
-    const Resend = (await import("npm:resend@2.0.0")).Resend;
-    const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
-
-    await resend.emails.send({
-      from: "KanFlow <noreply@kanflow.app>",
-      to: email,
-      subject: `${inviterName} convidou você para ${project.name}`,
-      html: `
-        <h2>Você foi convidado!</h2>
-        <p>${inviterName} convidou você para colaborar no projeto <strong>${project.name}</strong>.</p>
-        <p><a href="${inviteUrl}" style="background: #8b5cf6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Aceitar Convite</a></p>
-        <p style="color: #666; font-size: 12px;">Este convite expira em 7 dias.</p>
-      `,
-    });
-    */
-
-    console.log(`📬 Email would be sent to: ${email}`);
-    console.log(`📝 Invite URL: ${inviteUrl}`);
+    console.log(`Invite sent to ${email} for project ${project.name}`);
+    console.log(`Invite URL: ${inviteUrl}`);
+    console.log(`Invited by: ${inviterName || 'Unknown'}`);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        inviteUrl,
-        message: "Convite criado com sucesso. Email será enviado quando Resend estiver configurado."
-      }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      }
+      JSON.stringify({ ok: true, inviteUrl, message: 'Invite created successfully' }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {
-    console.error("❌ Error in send-invite:", error);
+    console.error('Error in send-invite function:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      JSON.stringify({ error: error.message || 'Internal server error' }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
