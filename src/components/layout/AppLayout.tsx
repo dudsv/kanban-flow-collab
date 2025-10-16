@@ -3,6 +3,9 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { NotificationBadge } from '@/components/notifications/NotificationBadge';
+import { ShortcutsDialog } from '@/components/shortcuts/ShortcutsDialog';
+import { useGlobalShortcuts } from '@/hooks/useKeyboardShortcuts';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,6 +25,9 @@ export function AppLayout({ children }: AppLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  
+  useGlobalShortcuts(() => setShortcutsOpen(true));
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
@@ -106,6 +112,18 @@ export function AppLayout({ children }: AppLayoutProps) {
           </div>
 
           <div className="flex items-center gap-4">
+            <NotificationBadge />
+            
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShortcutsOpen(true)}
+              className="transition-smooth"
+              title="Atalhos (?)"
+            >
+              <span className="text-lg font-bold">?</span>
+            </Button>
+
             <Button
               variant="ghost"
               size="icon"
@@ -146,6 +164,8 @@ export function AppLayout({ children }: AppLayoutProps) {
       </header>
 
       <main className="container mx-auto px-4 py-8">{children}</main>
+      
+      <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </div>
   );
 }

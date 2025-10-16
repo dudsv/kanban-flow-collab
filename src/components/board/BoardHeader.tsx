@@ -1,8 +1,11 @@
-import { Search, Tag, Users, Flag, FolderOpen } from 'lucide-react';
+import { useState } from 'react';
+import { Search, Tag, Users, Flag, FolderOpen, Settings, Download, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { ExportImportDialog } from './ExportImportDialog';
+import { TrashDrawer } from '@/components/trash/TrashDrawer';
 import {
   Select,
   SelectContent,
@@ -40,10 +43,30 @@ export function BoardHeader({
   onAssigneesChange
 }: BoardHeaderProps) {
   const priorities = ['low', 'medium', 'high', 'critical'];
+  const navigate = useNavigate();
+  const [exportOpen, setExportOpen] = useState(false);
+  const [trashOpen, setTrashOpen] = useState(false);
 
   return (
-    <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 py-4">
+    <>
+      <ExportImportDialog projectId={projectId} open={exportOpen} onOpenChange={setExportOpen} />
+      <TrashDrawer projectId={projectId} open={trashOpen} onOpenChange={setTrashOpen} />
+      
+      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 py-4">
       <div className="flex items-center gap-4 flex-wrap">
+        {/* Action Buttons */}
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => navigate(`/projects/${projectId}/settings`)} title="Configurações">
+            <Settings className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setExportOpen(true)} title="Exportar/Importar">
+            <Download className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setTrashOpen(true)} title="Lixeira">
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+        
         {/* Files Link */}
         <Link to={`/projects/${projectId}/files`}>
           <Button variant="outline" size="sm">
@@ -147,5 +170,6 @@ export function BoardHeader({
         </div>
       </div>
     </div>
+    </>
   );
 }

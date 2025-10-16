@@ -17,7 +17,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 interface Member {
   user_id: string;
-  role: string;
+  role: 'viewer' | 'member' | 'admin' | 'owner';
   profiles: {
     name: string;
     avatar_url: string | null;
@@ -95,7 +95,7 @@ export function MembersSection({ projectId }: MembersSectionProps) {
     }
   };
 
-  const handleChangeRole = async (userId: string, newRole: string) => {
+  const handleChangeRole = async (userId: string, newRole: 'viewer' | 'member' | 'admin' | 'owner') => {
     try {
       const { error } = await supabase
         .from('project_members')

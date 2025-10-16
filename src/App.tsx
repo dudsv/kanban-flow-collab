@@ -12,6 +12,8 @@ import People from "./pages/People";
 import Board from "./pages/Board";
 import Files from "./pages/Files";
 import Chat from "./pages/Chat";
+import Settings from "./pages/Settings";
+import Notifications from "./pages/Notifications";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -43,6 +45,14 @@ const App = () => (
                 }
               />
               <Route
+                path="/notifications"
+                element={
+                  <AuthGuard>
+                    <Notifications />
+                  </AuthGuard>
+                }
+              />
+              <Route
                 path="/projects/:id/board"
                 element={
                   <AuthGuard>
@@ -55,6 +65,14 @@ const App = () => (
                 element={
                   <AuthGuard>
                     <Files />
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/projects/:id/settings"
+                element={
+                  <AuthGuard>
+                    <Settings />
                   </AuthGuard>
                 }
               />

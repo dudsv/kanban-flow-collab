@@ -9,7 +9,7 @@ import { Globe, Lock } from 'lucide-react';
 
 interface VisibilitySectionProps {
   projectId: string;
-  currentVisibility: string;
+  currentVisibility: 'private' | 'public';
   onUpdate: () => void;
 }
 
@@ -18,7 +18,7 @@ export function VisibilitySection({
   currentVisibility,
   onUpdate,
 }: VisibilitySectionProps) {
-  const [visibility, setVisibility] = useState(currentVisibility);
+  const [visibility, setVisibility] = useState<'private' | 'public'>(currentVisibility);
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
