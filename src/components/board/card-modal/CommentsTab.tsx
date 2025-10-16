@@ -132,7 +132,8 @@ export function CommentsTab({ card, projectId, onUpdate }: CommentsTabProps) {
   };
 
   const postComment = async () => {
-    const content = editor?.getHTML() || '';
+    if (!editor) return;
+    const content = editor.getHTML();
     if (!content.trim() || content === '<p></p>') return;
 
     setPosting(true);

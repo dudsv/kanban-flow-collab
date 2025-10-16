@@ -63,17 +63,12 @@ export function AttachmentsTab({ card, projectId, onUpdate }: AttachmentsTabProp
 
         if (uploadError) throw uploadError;
 
-        // Get public URL
-        const { data: { publicUrl } } = supabase.storage
-          .from('project-files')
-          .getPublicUrl(filePath);
-
         // Insert record
         await supabase.from('files').insert({
           project_id: projectId,
           card_id: card.id,
           name: file.name,
-          url: publicUrl,
+          url: filePath,
           mime_type: file.type,
           size_bytes: file.size,
           uploaded_by: user.user.id
@@ -101,9 +96,8 @@ export function AttachmentsTab({ card, projectId, onUpdate }: AttachmentsTabProp
 
   const deleteFile = async (fileId: string, fileUrl: string) => {
     try {
-      // Extract path from URL
-      const urlParts = fileUrl.split('/');
-      const filePath = urlParts.slice(-3).join('/');
+      // Use the file path directly (it's stored as path now, not URL)
+      const filePath = fileUrl;
 
       // Delete from storage
       await supabase.storage
@@ -202,7 +196,10 @@ export function AttachmentsTab({ card, projectId, onUpdate }: AttachmentsTabProp
                 <Button
                   size="icon"
                   variant="ghost"
-                  onClick={() => window.open(file.url, '_blank')}
+                  onClick={() => {
+                    const { data } = supabase.storage.from('project-files').getPublicUrl(file.url);
+                    window.open(data.publicUrl, '_blank');
+                  }}
                   title="Visualizar"
                 >
                   <Eye className="h-4 w-4" />
@@ -211,7 +208,10 @@ export function AttachmentsTab({ card, projectId, onUpdate }: AttachmentsTabProp
               <Button
                 size="icon"
                 variant="ghost"
-                onClick={() => window.open(file.url, '_blank')}
+                onClick={() => {
+                  const { data } = supabase.storage.from('project-files').getPublicUrl(file.url);
+                  window.open(data.publicUrl, '_blank');
+                }}
                 title="Download"
               >
                 <Download className="h-4 w-4" />
