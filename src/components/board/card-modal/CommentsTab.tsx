@@ -259,7 +259,7 @@ export function CommentsTab({ card, projectId }: CommentsTabProps) {
           }))
         );
 
-        // Create notifications
+        // Create notifications with enriched payload
         await supabase.from('notifications').insert(
           mentionedUserIds.map((userId) => ({
             user_id: userId,
@@ -267,7 +267,10 @@ export function CommentsTab({ card, projectId }: CommentsTabProps) {
             payload: {
               projectId,
               cardId: card.id,
+              cardTitle: card.title,
               commentId: comment.id,
+              actorName: user.user.user_metadata?.name || user.user.email || 'Alguém',
+              actorId: user.user.id,
             },
           }))
         );

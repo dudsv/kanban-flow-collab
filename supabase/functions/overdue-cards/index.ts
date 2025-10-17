@@ -29,7 +29,7 @@ serve(async (req) => {
 
     console.log(`Found ${overdueCards?.length || 0} overdue cards`);
 
-    // Criar notificações para assignees
+    // Criar notificações para assignees com payload enriquecido
     const notifications = [];
     for (const card of overdueCards || []) {
       for (const assignee of card.card_assignees) {
@@ -41,6 +41,8 @@ serve(async (req) => {
             cardTitle: card.title,
             projectId: card.project_id,
             dueDate: card.due_at,
+            actorName: 'Sistema',
+            actorId: null,
           },
         });
       }

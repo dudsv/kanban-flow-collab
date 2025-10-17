@@ -32,7 +32,7 @@ export function useMessages(conversationId: string) {
       .select(`
         *,
         author:profiles!messages_author_id_fkey(name, avatar_url, email),
-        files(*),
+        files:files!files_message_id_fkey(*),
         message_reactions(*),
         message_reads(*)
       `)

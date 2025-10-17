@@ -469,6 +469,7 @@ export type Database = {
           deleted_at: string | null
           folder_id: string | null
           id: string
+          message_id: string | null
           mime_type: string | null
           name: string
           project_id: string
@@ -482,6 +483,7 @@ export type Database = {
           deleted_at?: string | null
           folder_id?: string | null
           id?: string
+          message_id?: string | null
           mime_type?: string | null
           name: string
           project_id: string
@@ -495,6 +497,7 @@ export type Database = {
           deleted_at?: string | null
           folder_id?: string | null
           id?: string
+          message_id?: string | null
           mime_type?: string | null
           name?: string
           project_id?: string
@@ -515,6 +518,13 @@ export type Database = {
             columns: ["folder_id"]
             isOneToOne: false
             referencedRelation: "folders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "files_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
             referencedColumns: ["id"]
           },
           {
@@ -938,8 +948,16 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      can_read_conversation: {
+        Args: { cid: string; uid: string }
+        Returns: boolean
+      }
       can_read_project: {
         Args: { pid: string }
+        Returns: boolean
+      }
+      can_write_conversation: {
+        Args: { cid: string; uid: string }
         Returns: boolean
       }
       has_role: {
@@ -951,6 +969,14 @@ export type Database = {
       }
       is_admin_project: {
         Args: { pid: string }
+        Returns: boolean
+      }
+      is_conversation_member: {
+        Args: { cid: string; uid: string }
+        Returns: boolean
+      }
+      is_conversation_member_self: {
+        Args: { conv_id: string }
         Returns: boolean
       }
       is_project_admin_member: {
@@ -969,9 +995,14 @@ export type Database = {
         Args: { path: string }
         Returns: string
       }
+      resolve_conv_project_id: {
+        Args: { p_card_id: string; p_project_id: string }
+        Returns: string
+      }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
+      conversation_type: "dm" | "group" | "project" | "card"
       convo_t: "dm" | "group" | "project" | "card"
       priority_t: "low" | "medium" | "high" | "critical"
       proj_role_t: "owner" | "admin" | "member" | "viewer"
@@ -1105,6 +1136,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "moderator", "user"],
+      conversation_type: ["dm", "group", "project", "card"],
       convo_t: ["dm", "group", "project", "card"],
       priority_t: ["low", "medium", "high", "critical"],
       proj_role_t: ["owner", "admin", "member", "viewer"],

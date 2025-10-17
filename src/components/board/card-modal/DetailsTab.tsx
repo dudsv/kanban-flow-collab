@@ -288,6 +288,22 @@ export function DetailsTab({ mode, card, projectId, columnId, tags, onCreated, o
             .from('card_assignees')
             .insert({ card_id: card!.id, user_id: userId });
           setSelectedAssignees(prev => [...prev, userId]);
+
+          // Create notification for assignment
+          const { data: { user: currentUser } } = await supabase.auth.getUser();
+          if (currentUser) {
+            await supabase.from('notifications').insert({
+              user_id: userId,
+              type: 'assigned',
+              payload: {
+                projectId,
+                cardId: card!.id,
+                cardTitle: card!.title,
+                actorName: currentUser.user_metadata?.name || currentUser.email || 'Alguém',
+                actorId: currentUser.id,
+              },
+            });
+          }
         }
       } catch (error) {
         console.error('Error toggling assignee:', error);

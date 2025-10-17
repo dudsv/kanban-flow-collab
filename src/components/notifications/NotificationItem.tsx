@@ -20,38 +20,38 @@ export function NotificationItem({ notification, onMarkAsRead }: NotificationIte
     switch (type) {
       case 'mention':
         return {
-          title: `${payload.actorName} mencionou você`,
-          description: `em "${payload.cardTitle}"`,
+          title: `${payload.actorName || 'Alguém'} mencionou você`,
+          description: `em "${payload.cardTitle || '(sem título)'}"`,
           link: `/projects/${payload.projectId}/board`,
         };
       case 'assigned':
         return {
-          title: `${payload.actorName} atribuiu você`,
-          description: `ao card "${payload.cardTitle}"`,
+          title: `${payload.actorName || 'Alguém'} atribuiu você`,
+          description: `ao card "${payload.cardTitle || '(sem título)'}"`,
           link: `/projects/${payload.projectId}/board`,
         };
       case 'moved':
         return {
           title: `Card movido`,
-          description: `"${payload.cardTitle}" foi movido para ${payload.columnName}`,
+          description: `"${payload.cardTitle || '(sem título)'}" foi movido para ${payload.columnName || '(coluna)'}`,
           link: `/projects/${payload.projectId}/board`,
         };
       case 'overdue':
         return {
           title: `Card atrasado`,
-          description: `"${payload.cardTitle}" está vencido`,
+          description: `"${payload.cardTitle || '(sem título)'}" está vencido`,
           link: `/projects/${payload.projectId}/board`,
         };
       case 'upload':
         return {
           title: `Novo arquivo`,
-          description: `${payload.fileName} foi adicionado ao projeto`,
+          description: `${payload.fileName || 'Um arquivo'} foi adicionado ao projeto`,
           link: `/projects/${payload.projectId}/files`,
         };
       case 'priority_change':
         return {
           title: `Prioridade alterada`,
-          description: `"${payload.cardTitle}" agora tem prioridade ${payload.priority}`,
+          description: `"${payload.cardTitle || '(sem título)'}" agora tem prioridade ${payload.priority}`,
           link: `/projects/${payload.projectId}/board`,
         };
       default:
