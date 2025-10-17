@@ -133,7 +133,7 @@ export const useBoardRealtime = (projectId: string, onUpdate: () => void) => {
           },
           (payload: RealtimePostgresChangesPayload<any>) => {
             console.log('Checklist change:', payload);
-            onUpdate();
+            // Não recarregar board - ChecklistTab já tem optimistic UI
           }
         )
         .subscribe()

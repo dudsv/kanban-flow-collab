@@ -86,6 +86,38 @@ export function DetailsTab({ mode, card, projectId, columnId, tags, onCreated, o
     loadProjectMembers();
   }, [projectId]);
 
+  // Realtime listener for card assignees
+  useEffect(() => {
+    if (mode !== 'edit' || !card) return;
+
+    const channel = supabase
+      .channel(`card_assignees:${card.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'card_assignees',
+          filter: `card_id=eq.${card.id}`
+        },
+        async () => {
+          const { data } = await supabase
+            .from('card_assignees')
+            .select('user_id')
+            .eq('card_id', card.id);
+          
+          if (data) {
+            setSelectedAssignees(data.map(a => a.user_id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [card?.id, mode]);
+
   const loadProjectMembers = async () => {
     try {
       const { data, error } = await supabase
@@ -304,9 +336,21 @@ export function DetailsTab({ mode, card, projectId, columnId, tags, onCreated, o
               },
             });
           }
+
+          toast({
+            title: isAssigned ? 'Usuário removido' : 'Usuário atribuído',
+            description: isAssigned 
+              ? 'A atribuição foi removida com sucesso' 
+              : 'O usuário foi atribuído ao card com sucesso'
+          });
         }
       } catch (error) {
         console.error('Error toggling assignee:', error);
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível atualizar a atribuição',
+          variant: 'destructive'
+        });
       }
     }
   };

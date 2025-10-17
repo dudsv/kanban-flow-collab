@@ -53,10 +53,14 @@ export function CommentsTab({ card, projectId }: CommentsTabProps) {
           items.map((item: any, index: number) => (
             <button
               key={item.user_id}
+              type="button"
               className={`w-full px-2 py-1.5 text-sm rounded flex items-center gap-2 ${
                 index === selectedIndex ? 'bg-accent' : 'hover:bg-accent/50'
               }`}
-              onClick={() => selectItem(index)}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                selectItem(index);
+              }}
             >
               <Avatar className="h-6 w-6">
                 <AvatarImage src={item.profiles?.avatar_url || ''} />
@@ -133,7 +137,28 @@ export function CommentsTab({ card, projectId }: CommentsTabProps) {
                   popup[0].hide();
                   return true;
                 }
-                return (component.ref as any)?.onKeyDown?.(props) ?? false;
+                
+                if (props.event.key === 'ArrowDown') {
+                  const currentIndex = (component.ref as any)?.selectedIndex ?? 0;
+                  const nextIndex = Math.min(currentIndex + 1, props.items.length - 1);
+                  (component.ref as any)?.setSelectedIndex?.(nextIndex);
+                  return true;
+                }
+                
+                if (props.event.key === 'ArrowUp') {
+                  const currentIndex = (component.ref as any)?.selectedIndex ?? 0;
+                  const prevIndex = Math.max(currentIndex - 1, 0);
+                  (component.ref as any)?.setSelectedIndex?.(prevIndex);
+                  return true;
+                }
+                
+                if (props.event.key === 'Enter') {
+                  const currentIndex = (component.ref as any)?.selectedIndex ?? 0;
+                  props.command(props.items[currentIndex]);
+                  return true;
+                }
+                
+                return false;
               },
               onExit: () => {
                 popup[0].destroy();
@@ -302,12 +327,10 @@ export function CommentsTab({ card, projectId }: CommentsTabProps) {
       <div className="space-y-3 p-4 border border-border rounded-lg bg-muted/30">
         <label className="text-sm font-medium">Novo comentário</label>
 
-        <div className="border border-input rounded-md bg-background">
           <EditorContent
             editor={editor}
-            className="prose prose-sm max-w-none p-3 min-h-[100px] focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 rounded-md"
+            className="prose prose-sm max-w-none p-3 min-h-[100px] border border-input rounded-md bg-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
           />
-        </div>
 
         <div className="flex items-center justify-between">
           <p className="text-xs text-muted-foreground">
