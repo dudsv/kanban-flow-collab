@@ -46,6 +46,7 @@ interface DetailsTabProps {
   tags: Tag[];
   onCreated?: () => void;
   onClose?: () => void;
+  onUpdate?: () => void;
 }
 
 const priorities: Priority[] = ['low', 'medium', 'high', 'critical'];
@@ -57,7 +58,7 @@ const priorityLabels: Record<Priority, string> = {
   critical: 'Crítica'
 };
 
-export function DetailsTab({ mode, card, projectId, columnId, tags, onCreated, onClose }: DetailsTabProps) {
+export function DetailsTab({ mode, card, projectId, columnId, tags, onCreated, onClose, onUpdate }: DetailsTabProps) {
   const [title, setTitle] = useState(mode === 'edit' ? card?.title || '' : '');
   const [priority, setPriority] = useState<Priority | undefined>(mode === 'edit' ? card?.priority || undefined : 'medium');
   const [dueDate, setDueDate] = useState(mode === 'edit' ? card?.due_at || '' : '');
@@ -237,6 +238,7 @@ export function DetailsTab({ mode, card, projectId, columnId, tags, onCreated, o
         }
 
         toast({ title: 'Alterações salvas!' });
+        onUpdate?.();
       }
     } catch (error: any) {
       console.error('Save error:', error);
@@ -315,11 +317,14 @@ export function DetailsTab({ mode, card, projectId, columnId, tags, onCreated, o
             .eq('card_id', card!.id)
             .eq('user_id', userId);
           setSelectedAssignees(prev => prev.filter(id => id !== userId));
+          onUpdate?.();
         } else {
           await supabase
             .from('card_assignees')
             .insert({ card_id: card!.id, user_id: userId });
           setSelectedAssignees(prev => [...prev, userId]);
+
+          onUpdate?.();
 
           // Create notification for assignment
           const { data: { user: currentUser } } = await supabase.auth.getUser();
@@ -339,8 +344,8 @@ export function DetailsTab({ mode, card, projectId, columnId, tags, onCreated, o
 
           toast({
             title: isAssigned ? 'Usuário removido' : 'Usuário atribuído',
-            description: isAssigned 
-              ? 'A atribuição foi removida com sucesso' 
+            description: isAssigned
+              ? 'A atribuição foi removida com sucesso'
               : 'O usuário foi atribuído ao card com sucesso'
           });
         }

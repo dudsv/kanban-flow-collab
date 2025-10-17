@@ -70,7 +70,7 @@ export function CardModal({ mode, card, projectId, columnId, tags, onClose, onUp
 
           <div className="flex-1 overflow-y-auto mt-4">
             <TabsContent value="details" className="mt-0">
-              <DetailsTab 
+              <DetailsTab
                 mode={mode}
                 card={card}
                 projectId={projectId}
@@ -78,6 +78,7 @@ export function CardModal({ mode, card, projectId, columnId, tags, onClose, onUp
                 tags={tags}
                 onCreated={onCreated}
                 onClose={onClose}
+                onUpdate={onUpdate}
               />
             </TabsContent>
 
