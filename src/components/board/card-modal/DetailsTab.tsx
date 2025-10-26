@@ -317,11 +317,13 @@ export function DetailsTab({ mode, card, projectId, columnId, tags, onCreated, o
             .eq('card_id', card!.id)
             .eq('user_id', userId);
           setSelectedAssignees(prev => prev.filter(id => id !== userId));
+          onUpdate?.();
         } else {
           await supabase
             .from('card_assignees')
             .insert({ card_id: card!.id, user_id: userId });
           setSelectedAssignees(prev => [...prev, userId]);
+          onUpdate?.();
 
           // Create notification for assignment
           const { data: { user: currentUser } } = await supabase.auth.getUser();
