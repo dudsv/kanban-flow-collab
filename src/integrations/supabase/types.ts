@@ -944,18 +944,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      auth_uid: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      auth_uid: { Args: never; Returns: string }
       can_read_conversation: {
         Args: { cid: string; uid: string }
         Returns: boolean
       }
-      can_read_project: {
-        Args: { pid: string }
-        Returns: boolean
-      }
+      can_read_project: { Args: { pid: string }; Returns: boolean }
       can_write_conversation: {
         Args: { cid: string; uid: string }
         Returns: boolean
@@ -967,10 +961,7 @@ export type Database = {
         }
         Returns: boolean
       }
-      is_admin_project: {
-        Args: { pid: string }
-        Returns: boolean
-      }
+      is_admin_project: { Args: { pid: string }; Returns: boolean }
       is_conversation_member: {
         Args: { cid: string; uid: string }
         Returns: boolean
@@ -987,14 +978,8 @@ export type Database = {
         Args: { pid: string; uid: string }
         Returns: boolean
       }
-      is_superadmin: {
-        Args: { uid: string }
-        Returns: boolean
-      }
-      path_project_id: {
-        Args: { path: string }
-        Returns: string
-      }
+      is_superadmin: { Args: { uid: string }; Returns: boolean }
+      path_project_id: { Args: { path: string }; Returns: string }
       resolve_conv_project_id: {
         Args: { p_card_id: string; p_project_id: string }
         Returns: string
