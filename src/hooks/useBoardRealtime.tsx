@@ -99,7 +99,7 @@ export const useBoardRealtime = (projectId: string, onUpdate: () => void) => {
           },
           (payload: RealtimePostgresChangesPayload<any>) => {
             console.log('Comment change:', payload);
-            onUpdate();
+            // Não recarregar board - CommentsTab já tem optimistic UI
           }
         )
         .subscribe(),

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -33,8 +33,31 @@ export function CommentsTab({ card, projectId }: CommentsTabProps) {
   const [posting, setPosting] = useState(false);
   const [editorReady, setEditorReady] = useState(false);
 
-  const MentionList = ({ items, command }: any) => {
+  interface MentionListRef {
+    onKeyDown: (props: any) => boolean;
+  }
+
+  const MentionList = forwardRef<MentionListRef, any>(({ items, command }, ref) => {
     const [selectedIndex, setSelectedIndex] = useState(0);
+
+    useImperativeHandle(ref, () => ({
+      onKeyDown: ({ event }: any) => {
+        if (event.key === 'ArrowDown') {
+          setSelectedIndex((prev) => Math.min(prev + 1, items.length - 1));
+          return true;
+        }
+        if (event.key === 'ArrowUp') {
+          setSelectedIndex((prev) => Math.max(prev - 1, 0));
+          return true;
+        }
+        if (event.key === 'Enter') {
+          const item = items[selectedIndex];
+          if (item) command({ id: item.user_id, label: item.profiles?.name });
+          return true;
+        }
+        return false;
+      }
+    }));
 
     const selectItem = (index: number) => {
       const item = items[index];
@@ -74,7 +97,9 @@ export function CommentsTab({ card, projectId }: CommentsTabProps) {
         )}
       </div>
     );
-  };
+  });
+  
+  MentionList.displayName = 'MentionList';
 
   const editor = useEditor({
     extensions: [
@@ -106,7 +131,7 @@ export function CommentsTab({ card, projectId }: CommentsTabProps) {
               .slice(0, 5);
           },
           render: () => {
-            let component: ReactRenderer;
+            let component: ReactRenderer<MentionListRef>;
             let popup: TippyInstance[];
 
             return {
@@ -138,27 +163,8 @@ export function CommentsTab({ card, projectId }: CommentsTabProps) {
                   return true;
                 }
                 
-                if (props.event.key === 'ArrowDown') {
-                  const currentIndex = (component.ref as any)?.selectedIndex ?? 0;
-                  const nextIndex = Math.min(currentIndex + 1, props.items.length - 1);
-                  (component.ref as any)?.setSelectedIndex?.(nextIndex);
-                  return true;
-                }
-                
-                if (props.event.key === 'ArrowUp') {
-                  const currentIndex = (component.ref as any)?.selectedIndex ?? 0;
-                  const prevIndex = Math.max(currentIndex - 1, 0);
-                  (component.ref as any)?.setSelectedIndex?.(prevIndex);
-                  return true;
-                }
-                
-                if (props.event.key === 'Enter') {
-                  const currentIndex = (component.ref as any)?.selectedIndex ?? 0;
-                  props.command(props.items[currentIndex]);
-                  return true;
-                }
-                
-                return false;
+                // Delegar para o MentionList via ref
+                return component.ref?.onKeyDown?.(props) ?? false;
               },
               onExit: () => {
                 popup[0].destroy();
@@ -329,7 +335,7 @@ export function CommentsTab({ card, projectId }: CommentsTabProps) {
 
           <EditorContent
             editor={editor}
-            className="prose prose-sm max-w-none p-3 min-h-[100px] border border-input rounded-md bg-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
+            className="prose prose-sm max-w-none p-3 min-h-[100px] border border-input rounded-md focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
           />
 
         <div className="flex items-center justify-between">
